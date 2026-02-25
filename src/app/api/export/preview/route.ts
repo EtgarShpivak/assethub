@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { generateExportFilename } from '@/lib/export-naming';
 import { PLATFORM_SPECS } from '@/lib/platform-specs';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = createServiceRoleClient();
   const body = await request.json();
 

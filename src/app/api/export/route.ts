@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { generateExportFilename } from '@/lib/export-naming';
-import archiver from 'archiver';
-import { PassThrough, Readable } from 'stream';
+import JSZip from 'jszip';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
@@ -43,10 +48,8 @@ export async function POST(request: NextRequest) {
   // Group assets by dimensions for sequence numbering
   const dimCounters: Record<string, number> = {};
 
-  // Create ZIP archive
-  const archive = archiver('zip', { zlib: { level: 5 } });
-  const passthrough = new PassThrough();
-  archive.pipe(passthrough);
+  // Create ZIP using JSZip (works on Vercel serverless)
+  const zip = new JSZip();
 
   for (const asset of assets) {
     if (!asset.drive_file_id) continue;
@@ -78,18 +81,18 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Convert Blob to Node.js Readable stream for archiver
       const arrayBuffer = await fileData.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const readable = Readable.from(buffer);
-
-      archive.append(readable, { name: filename });
+      zip.file(filename, arrayBuffer);
     } catch (err) {
       console.error(`Failed to fetch file ${asset.drive_file_id}:`, err);
     }
   }
 
-  await archive.finalize();
+  const zipBuffer = await zip.generateAsync({
+    type: 'arraybuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 5 },
+  });
 
   // Log the export
   await supabase.from('export_logs').insert({
@@ -105,7 +108,7 @@ export async function POST(request: NextRequest) {
     'Content-Disposition',
     `attachment; filename="${workspace.slug_prefix}_${platform}_export.zip"`
   );
+  headers.set('Content-Length', zipBuffer.byteLength.toString());
 
-  // @ts-expect-error PassThrough is a readable stream
-  return new NextResponse(passthrough, { headers });
+  return new NextResponse(zipBuffer, { headers });
 }

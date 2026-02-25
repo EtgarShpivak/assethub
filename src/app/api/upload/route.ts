@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { computeAspectRatio, computeDimensionsLabel, computeFileSizeLabel } from '@/lib/aspect-ratio';
 import sharp from 'sharp';
-import { randomUUID } from 'crypto';
 import JSZip from 'jszip';
+
+// Generate a UUID without Node.js crypto module (Vercel compatible)
+function generateUUID(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +59,11 @@ interface FileToProcess {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = createServiceRoleClient();
 
   const formData = await request.formData();
@@ -177,7 +191,7 @@ export async function POST(request: NextRequest) {
 
       const fileSizeLabel = computeFileSizeLabel(file.size);
       const ext = file.name.split('.').pop() || 'bin';
-      const storedFilename = `${randomUUID()}.${ext}`;
+      const storedFilename = `${generateUUID()}.${ext}`;
       const fullPath = `${storagePath}/${storedFilename}`;
 
       // Upload to Supabase Storage

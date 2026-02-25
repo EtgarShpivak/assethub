@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { HelpCircle } from 'lucide-react';
 
 interface InfoTooltipProps {
@@ -11,35 +12,63 @@ interface InfoTooltipProps {
 
 export function InfoTooltip({ text, size = 'sm', className = '' }: InfoTooltipProps) {
   const [show, setShow] = useState(false);
-  const [position, setPosition] = useState<'above' | 'below'>('above');
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, position: 'above' as 'above' | 'below' });
   const iconRef = useRef<HTMLButtonElement>(null);
+  const [mounted, setMounted] = useState(false);
 
-  const updatePosition = useCallback(() => {
+  useEffect(() => { setMounted(true); }, []);
+
+  const updateCoords = useCallback(() => {
     if (!iconRef.current) return;
     const rect = iconRef.current.getBoundingClientRect();
-    // If the icon is within 120px of the top of the viewport, show tooltip below
-    setPosition(rect.top < 120 ? 'below' : 'above');
+    const tooltipWidth = 224; // w-56 = 14rem = 224px
+    const showBelow = rect.top < 130;
+
+    // Center tooltip horizontally on the icon
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    // Clamp to viewport
+    if (left < 8) left = 8;
+    if (left + tooltipWidth > window.innerWidth - 8) left = window.innerWidth - tooltipWidth - 8;
+
+    setCoords({
+      top: showBelow ? rect.bottom + 8 : rect.top - 8,
+      left,
+      position: showBelow ? 'below' : 'above',
+    });
   }, []);
 
   useEffect(() => {
     if (!show) return;
-    const handleClick = (e: MouseEvent) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node) &&
-          iconRef.current && !iconRef.current.contains(e.target as Node)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (iconRef.current && !iconRef.current.contains(e.target as Node)) {
         setShow(false);
       }
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [show]);
 
   const handleShow = () => {
-    updatePosition();
+    updateCoords();
     setShow(true);
   };
 
   const iconSize = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
+
+  const tooltip = show && mounted ? createPortal(
+    <div
+      className="fixed z-[9999] w-56 bg-ono-gray-dark text-white text-xs rounded-lg p-3 shadow-xl leading-relaxed pointer-events-none"
+      style={{
+        direction: 'rtl',
+        top: coords.position === 'below' ? `${coords.top}px` : undefined,
+        bottom: coords.position === 'above' ? `${window.innerHeight - coords.top}px` : undefined,
+        left: `${coords.left}px`,
+      }}
+    >
+      {text}
+    </div>,
+    document.body
+  ) : null;
 
   return (
     <span className={`relative inline-flex items-center ${className}`}>
@@ -54,25 +83,7 @@ export function InfoTooltip({ text, size = 'sm', className = '' }: InfoTooltipPr
       >
         <HelpCircle className={iconSize} />
       </button>
-      {show && (
-        <div
-          ref={tooltipRef}
-          className={`absolute z-50 right-1/2 translate-x-1/2 w-56 bg-ono-gray-dark text-white text-xs rounded-lg p-3 shadow-lg leading-relaxed pointer-events-auto ${
-            position === 'above' ? 'bottom-full mb-2' : 'top-full mt-2'
-          }`}
-          style={{ direction: 'rtl' }}
-        >
-          {text}
-          {/* Arrow */}
-          <div className={`absolute right-1/2 translate-x-1/2 ${
-            position === 'above' ? 'top-full -mt-px' : 'bottom-full -mb-px'
-          }`}>
-            <div className={`w-2 h-2 bg-ono-gray-dark rotate-45 ${
-              position === 'above' ? '-translate-y-1' : 'translate-y-1'
-            }`} />
-          </div>
-        </div>
-      )}
+      {tooltip}
     </span>
   );
 }

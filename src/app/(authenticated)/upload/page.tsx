@@ -11,13 +11,22 @@ import {
   FileText,
   File,
   Package,
+  Plus,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES } from '@/lib/platform-specs';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES, containsHebrew } from '@/lib/platform-specs';
 import { computeFileSizeLabel } from '@/lib/aspect-ratio';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Slug, Initiative } from '@/lib/types';
@@ -56,7 +65,18 @@ export default function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState<Record<string, 'pending' | 'uploading' | 'done' | 'error'>>({});
   const [uploadResults, setUploadResults] = useState<{ uploaded: number; errors: number } | null>(null);
 
-  useEffect(() => {
+  // Quick initiative creation
+  const [showInitiativeModal, setShowInitiativeModal] = useState(false);
+  const [newInitName, setNewInitName] = useState('');
+  const [newInitCode, setNewInitCode] = useState('');
+  const [newInitCodeWarning, setNewInitCodeWarning] = useState('');
+  const [newInitIsCross, setNewInitIsCross] = useState(false);
+  const [newInitStartDate, setNewInitStartDate] = useState('');
+  const [newInitEndDate, setNewInitEndDate] = useState('');
+  const [savingInitiative, setSavingInitiative] = useState(false);
+  const [initError, setInitError] = useState('');
+
+  const fetchData = useCallback(() => {
     Promise.all([
       fetch('/api/workspaces').then(r => r.json()),
       fetch('/api/slugs').then(r => r.json()),
@@ -65,9 +85,11 @@ export default function UploadPage() {
       setWorkspaces(ws);
       setSlugs(sl);
       setInitiatives(ini);
-      if (ws.length > 0) setSelectedWorkspace(ws[0].id);
+      if (ws.length > 0 && !selectedWorkspace) setSelectedWorkspace(ws[0].id);
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filteredInitiatives = initiatives.filter(
     (i) => !i.slug_id || i.slug_id === selectedSlug
@@ -138,6 +160,58 @@ export default function UploadPage() {
     setSelectedPlatforms(prev =>
       prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]
     );
+  };
+
+  const handleCreateInitiative = async () => {
+    if (!newInitName || !newInitCode || !selectedWorkspace) return;
+    if (!newInitIsCross && !selectedSlug) {
+      setInitError('יש לבחור סלאג קודם, או לסמן מהלך רוחבי');
+      return;
+    }
+    setSavingInitiative(true);
+    setInitError('');
+
+    try {
+      const res = await fetch('/api/initiatives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newInitName,
+          short_code: newInitCode,
+          slug_id: newInitIsCross ? null : selectedSlug,
+          workspace_id: selectedWorkspace,
+          start_date: newInitStartDate || null,
+          end_date: newInitEndDate || null,
+          notes: null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setInitError(data.error || 'שגיאה ביצירת מהלך');
+        setSavingInitiative(false);
+        return;
+      }
+
+      const created = await res.json();
+      // Refresh initiatives and auto-select the new one
+      const iniRes = await fetch('/api/initiatives');
+      const allIni = await iniRes.json();
+      setInitiatives(allIni);
+      setSelectedInitiative(created.id);
+
+      // Reset and close
+      setNewInitName('');
+      setNewInitCode('');
+      setNewInitCodeWarning('');
+      setNewInitIsCross(false);
+      setNewInitStartDate('');
+      setNewInitEndDate('');
+      setShowInitiativeModal(false);
+    } catch {
+      setInitError('שגיאה ביצירת מהלך');
+    }
+    setSavingInitiative(false);
   };
 
   const zipCount = files.filter(f => f.type.includes('zip') || f.name.endsWith('.zip')).length;
@@ -227,21 +301,33 @@ export default function UploadPage() {
               <select value={selectedSlug} onChange={e => { setSelectedSlug(e.target.value); setSelectedInitiative(''); }} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
                 <option value="">בחר סלאג...</option>
                 {slugs.filter(s => !s.is_archived).map(s => (
-                  <option key={s.id} value={s.id}>{s.slug.includes('-') ? '  ← ' : ''}{s.display_name} ({s.slug})</option>
+                  <option key={s.id} value={s.id}>{s.slug.includes('-') ? '  \u2190 ' : ''}{s.display_name} ({s.slug})</option>
                 ))}
               </select>
             </div>
 
             <div>
-              <Label className="flex items-center gap-1">מהלך שיווקי (אופציונלי) <InfoTooltip text="שייכו את החומר למהלך/קמפיין ספציפי. מוצגים רק מהלכים השייכים לסלאג שנבחר, או מהלכים רוחביים." /></Label>
-              <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
-                <option value="">ללא מהלך</option>
-                {filteredInitiatives.map(i => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} ({i.short_code}) {!i.slug_id ? '🌐' : ''}
-                  </option>
-                ))}
-              </select>
+              <Label className="flex items-center gap-1">מהלך שיווקי (אופציונלי) <InfoTooltip text="שייכו את החומר למהלך/קמפיין ספציפי. ניתן גם ליצור מהלך חדש ישירות מכאן." /></Label>
+              <div className="flex gap-1.5 mt-1">
+                <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} className="flex-1 border border-[#E8E8E8] rounded-md p-2 text-sm">
+                  <option value="">ללא מהלך</option>
+                  {filteredInitiatives.map(i => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({i.short_code}) {!i.slug_id ? '\uD83C\uDF10' : ''}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
+                  onClick={() => { setShowInitiativeModal(true); setInitError(''); }}
+                  title="צור מהלך חדש"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
 
             <div>
@@ -286,8 +372,8 @@ export default function UploadPage() {
           {uploadResults && (
             <div className={`p-3 rounded-lg ${uploadResults.errors > 0 ? 'bg-ono-orange-light' : 'bg-ono-green-light'}`}>
               <p className="text-sm font-medium">
-                {uploadResults.uploaded > 0 && <span className="text-ono-green-dark">✓ {uploadResults.uploaded} קבצים הועלו בהצלחה</span>}
-                {uploadResults.errors > 0 && <span className="text-ono-orange mr-3">✗ {uploadResults.errors} קבצים נכשלו</span>}
+                {uploadResults.uploaded > 0 && <span className="text-ono-green-dark">{'\u2713'} {uploadResults.uploaded} קבצים הועלו בהצלחה</span>}
+                {uploadResults.errors > 0 && <span className="text-ono-orange mr-3">{'\u2717'} {uploadResults.errors} קבצים נכשלו</span>}
               </p>
             </div>
           )}
@@ -308,6 +394,89 @@ export default function UploadPage() {
           </Button>
         </div>
       )}
+
+      {/* Quick Initiative Creation Modal */}
+      <Dialog open={showInitiativeModal} onOpenChange={setShowInitiativeModal}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-ono-green" />
+              יצירת מהלך שיווקי מהיר
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="flex items-center gap-1">שם המהלך * <InfoTooltip text="שם תיאורי בעברית, למשל: קמפיין חזרה ללימודים 2025." /></Label>
+              <Input className="mt-1" placeholder="קמפיין חזרה ללימודים 2025" value={newInitName} onChange={e => setNewInitName(e.target.value)} />
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-1">קוד קצר (באנגלית) * <InfoTooltip text="קוד באנגלית שישמש בשמות קבצי ייצוא. אותיות קטנות ומספרים בלבד." /></Label>
+              <Input
+                dir="ltr"
+                className={`text-left font-mono mt-1 ${newInitCodeWarning ? 'border-ono-orange' : ''}`}
+                placeholder="bts25"
+                value={newInitCode}
+                onChange={e => {
+                  const raw = e.target.value;
+                  if (containsHebrew(raw)) {
+                    setNewInitCodeWarning('שדה זה מקבל אותיות באנגלית בלבד.');
+                    return;
+                  }
+                  setNewInitCodeWarning('');
+                  setNewInitCode(raw.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                }}
+              />
+              {newInitCodeWarning && (
+                <p className="text-xs text-ono-orange mt-1">{newInitCodeWarning}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox checked={newInitIsCross} onCheckedChange={v => setNewInitIsCross(!!v)} />
+                <span className="text-sm flex items-center gap-1">
+                  <Globe className="w-4 h-4 text-ono-orange" />
+                  מהלך רוחבי (חוצה סלאגים)
+                </span>
+              </label>
+              {!newInitIsCross && !selectedSlug && (
+                <p className="text-xs text-ono-orange mt-1">יש לבחור סלאג בטופס ההעלאה קודם, או לסמן מהלך רוחבי.</p>
+              )}
+              {!newInitIsCross && selectedSlug && (
+                <p className="text-xs text-ono-gray mt-1">
+                  ישויך לסלאג: {slugs.find(s => s.id === selectedSlug)?.display_name}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>תאריך התחלה</Label>
+                <Input type="date" className="mt-1" value={newInitStartDate} onChange={e => setNewInitStartDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>תאריך סיום</Label>
+                <Input type="date" className="mt-1" value={newInitEndDate} onChange={e => setNewInitEndDate(e.target.value)} />
+              </div>
+            </div>
+
+            {initError && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{initError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInitiativeModal(false)}>ביטול</Button>
+            <Button
+              onClick={handleCreateInitiative}
+              disabled={savingInitiative || !newInitName || !newInitCode || (!newInitIsCross && !selectedSlug)}
+              className="bg-ono-green hover:bg-ono-green-dark text-white"
+            >
+              {savingInitiative ? 'יוצר...' : 'צור מהלך'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
