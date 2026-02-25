@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/dialog';
 import { DOMAIN_CONTEXTS, PLATFORMS, FILE_TYPES, ASPECT_RATIOS, ASSET_TYPES, DATE_PRESETS, getDatePresetRange } from '@/lib/platform-specs';
 import { createClient } from '@/lib/supabase/client';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Asset, Slug, Initiative, SavedSearch } from '@/lib/types';
 
 function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -501,6 +502,7 @@ export default function AssetLibraryPage() {
             <FolderOpen className="w-6 h-6 text-ono-green" />
             <h1 className="text-2xl font-bold text-ono-gray-dark">ספריית חומרים</h1>
             <Badge variant="outline" className="text-xs">{total} חומרים</Badge>
+            <InfoTooltip text="כאן מוצגים כל החומרים השיווקיים. ניתן לסנן, לחפש, להוריד ולשתף. לחצו על חומר לפרטים מלאים." size="md" />
           </div>
           <div className="flex items-center gap-2">
             {selectedAssets.size > 0 && (
@@ -665,7 +667,7 @@ export default function AssetLibraryPage() {
       <aside className="w-64 shrink-0 space-y-4">
         <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-ono-gray-dark text-sm">סינון</h3>
+            <h3 className="font-bold text-ono-gray-dark text-sm flex items-center gap-1">סינון <InfoTooltip text="סננו חומרים לפי קריטריונים שונים. ניתן לשלב מספר פילטרים ולשמור חיפושים נפוצים." /></h3>
             <div className="flex items-center gap-1">
               {hasActiveFilters && <Button variant="ghost" size="sm" onClick={() => setShowSaveDialog(true)} className="text-xs text-ono-green h-7 px-1.5" title="שמור חיפוש"><BookmarkPlus className="w-3.5 h-3.5" /></Button>}
               <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-ono-gray h-7 px-1.5">נקה הכל</Button>
@@ -674,7 +676,7 @@ export default function AssetLibraryPage() {
 
           {/* Date range presets - AT THE TOP */}
           <div>
-            <Label className="text-xs flex items-center gap-1 mb-2"><Calendar className="w-3 h-3" /> טווח תאריכים</Label>
+            <Label className="text-xs flex items-center gap-1 mb-2"><Calendar className="w-3 h-3" /> טווח תאריכים <InfoTooltip text="לחצו על פריסט מהיר או בחרו תאריכים ידנית. הפריסט מגדיר את טווח התאריכים אוטומטית." /></Label>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {DATE_PRESETS.map(preset => (
                 <button

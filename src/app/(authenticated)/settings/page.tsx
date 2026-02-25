@@ -31,6 +31,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Slug, Initiative, UserProfile } from '@/lib/types';
 
 interface UploadTokenEntry {
@@ -258,6 +259,7 @@ export default function SettingsPage() {
       <div className="flex items-center gap-3">
         <Settings className="w-6 h-6 text-ono-green" />
         <h1 className="text-2xl font-bold text-ono-gray-dark">הגדרות</h1>
+        <InfoTooltip text="ניהול משתמשים, תפקידים, הרשאות וקישורי העלאה חיצוניים. רק מנהלי מערכת יכולים לנהל משתמשים." size="md" />
         {currentUser && (
           <Badge className={`${ROLE_COLORS[currentUser.role]} text-xs`}>
             {ROLE_LABELS[currentUser.role]}
@@ -273,6 +275,7 @@ export default function SettingsPage() {
               <Users className="w-5 h-5 text-ono-green" />
               <h2 className="text-lg font-bold text-ono-gray-dark">ניהול משתמשים</h2>
               <Badge variant="outline" className="text-xs">{users.length}</Badge>
+              <InfoTooltip text="הזמינו משתמשים חדשים, הגדירו תפקידים והרשאות, והשביתו גישה למשתמשים שאינם פעילים." />
             </div>
             <Button onClick={() => { setShowInviteModal(true); setInviteError(''); setInviteSuccess(''); }} className="bg-ono-green hover:bg-ono-green-dark text-white" size="sm">
               <UserPlus className="w-4 h-4 ml-1" />
@@ -343,6 +346,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2">
             <LinkIcon className="w-5 h-5 text-ono-green" />
             <h2 className="text-lg font-bold text-ono-gray-dark">קישורי העלאה חיצוניים</h2>
+            <InfoTooltip text="צרו קישורים שמאפשרים לגורמים חיצוניים (מעצבים, פרילנסרים) להעלות חומרים ישירות למערכת ללא צורך בחשבון." />
           </div>
           <Button onClick={() => setShowTokenModal(true)} className="bg-ono-green hover:bg-ono-green-dark text-white" size="sm">
             <Plus className="w-4 h-4 ml-1" />
@@ -405,7 +409,7 @@ export default function SettingsPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>כתובת מייל *</Label>
+              <Label className="flex items-center gap-1">כתובת מייל * <InfoTooltip text="כתובת המייל שתשמש לכניסה למערכת. המשתמש יקבל הזמנה לאיפוס סיסמה." /></Label>
               <Input dir="ltr" className="mt-1 text-left" placeholder="user@example.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
             </div>
             <div>
@@ -418,7 +422,7 @@ export default function SettingsPage() {
               </select>
             </div>
             <div>
-              <Label className="mb-2 block">הרשאות</Label>
+              <Label className="mb-2 flex items-center gap-1">הרשאות <InfoTooltip text="הגדירו מה המשתמש יוכל לעשות במערכת. מנהל מערכת מקבל גישה מלאה אוטומטית." /></Label>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={invitePermissions.can_view} onCheckedChange={v => setInvitePermissions(p => ({ ...p, can_view: !!v }))} />
@@ -438,7 +442,8 @@ export default function SettingsPage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={invitePermissions.can_view_filtered} onCheckedChange={v => setInvitePermissions(p => ({ ...p, can_view_filtered: !!v }))} />
                   <Filter className="w-4 h-4 text-ono-gray" />
-                  <span className="text-sm">צפייה מסוננת בלבד (לפי חיתוך מתקדם)</span>
+                  <span className="text-sm">צפייה מסוננת בלבד</span>
+                  <InfoTooltip text="המשתמש יראה רק חומרים לפי סינון שנקבע מראש. מתאים לגישה מוגבלת למחלקה ספציפית." />
                 </label>
               </div>
             </div>

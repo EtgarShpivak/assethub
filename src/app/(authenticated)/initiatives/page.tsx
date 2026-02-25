@@ -22,6 +22,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { INITIATIVE_STATUSES, containsHebrew } from '@/lib/platform-specs';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Initiative, Slug } from '@/lib/types';
 
 const statusBadgeStyles: Record<string, string> = {
@@ -117,6 +118,7 @@ export default function InitiativesPage() {
         <div className="flex items-center gap-3">
           <Megaphone className="w-6 h-6 text-ono-green" />
           <h1 className="text-2xl font-bold text-ono-gray-dark">מהלכים שיווקיים</h1>
+          <InfoTooltip text="מהלך שיווקי = קמפיין או פרויקט שאליו משייכים חומרים. כל מהלך מקבל שם, קוד קצר באנגלית, ותאריכים." size="md" />
         </div>
         <Button onClick={() => setShowModal(true)} className="bg-ono-green hover:bg-ono-green-dark text-white">
           <Plus className="w-4 h-4 ml-2" />
@@ -210,12 +212,12 @@ export default function InitiativesPage() {
 
           <div className="space-y-4 py-4">
             <div>
-              <Label>שם המהלך *</Label>
+              <Label className="flex items-center gap-1">שם המהלך * <InfoTooltip text="שם תיאורי בעברית שמזהה את המהלך, למשל: קמפיין חזרה ללימודים 2025." /></Label>
               <Input className="mt-1" placeholder="קמפיין חזרה ללימודים 2025" value={formName} onChange={e => setFormName(e.target.value)} />
             </div>
 
             <div>
-              <Label>קוד קצר (באנגלית) *</Label>
+              <Label className="flex items-center gap-1">קוד קצר (באנגלית) * <InfoTooltip text="קוד באנגלית (אותיות קטנות ומספרים) שישמש בשמות קבצי ייצוא. למשל: bts25 עבור Back to School 2025." /></Label>
               <Input dir="ltr" className={`text-left font-mono mt-1 ${codeWarning ? 'border-ono-orange' : ''}`} placeholder="bts25" value={formCode} onChange={e => {
                 const raw = e.target.value;
                 if (containsHebrew(raw)) {
@@ -241,6 +243,7 @@ export default function InitiativesPage() {
                 <span className="text-sm flex items-center gap-1">
                   <Globe className="w-4 h-4 text-ono-orange" />
                   מהלך רוחבי (לא משויך לסלאג ספציפי)
+                  <InfoTooltip text="מהלך רוחבי חוצה תחומים ואינו שייך לסלאג אחד. לדוגמה: קמפיין כללי של המכללה." />
                 </span>
               </label>
 

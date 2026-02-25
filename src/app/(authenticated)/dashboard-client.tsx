@@ -11,6 +11,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Asset, Initiative } from '@/lib/types';
 
 interface DashboardClientProps {
@@ -84,7 +85,10 @@ export function DashboardClient({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-ono-gray-dark">דשבורד</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-bold text-ono-gray-dark">דשבורד</h1>
+        <InfoTooltip text="סקירה כללית של המערכת: חומרים, מהלכים פעילים, העלאות אחרונות וחומרים שממתינים לסיווג." size="md" />
+      </div>
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

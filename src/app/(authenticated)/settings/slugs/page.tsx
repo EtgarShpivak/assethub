@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Slug } from '@/lib/types';
 
 interface SlugWithCounts extends Slug {
@@ -215,6 +216,7 @@ export default function SlugManagerPage() {
         <div className="flex items-center gap-3">
           <FolderTree className="w-6 h-6 text-ono-green" />
           <h1 className="text-2xl font-bold text-ono-gray-dark">ניהול סלאגים</h1>
+          <InfoTooltip text="סלאגים מגדירים את מבנה התחומים של הארגון. כל חומר חייב להיות משויך לסלאג. השתמשו במקפים ליצירת היררכיה." size="md" />
         </div>
         <Button
           onClick={() => setShowModal(true)}
@@ -276,7 +278,7 @@ export default function SlugManagerPage() {
             )}
 
             <div>
-              <Label>מזהה סלאג (באנגלית)</Label>
+              <Label className="flex items-center gap-1">מזהה סלאג (באנגלית) <InfoTooltip text="מזהה ייחודי באנגלית (אותיות קטנות, מספרים ומקפים). השתמשו במקף ליצירת היררכיה: mba-finance הוא צאצא של mba." /></Label>
               <Input
                 dir="ltr"
                 className="text-left font-mono mt-1"
@@ -303,7 +305,7 @@ export default function SlugManagerPage() {
             </div>
 
             <div>
-              <Label>שם תצוגה (בעברית)</Label>
+              <Label className="flex items-center gap-1">שם תצוגה (בעברית) <InfoTooltip text="השם שיוצג בממשק המשתמש. כתבו שם ברור בעברית, למשל: מנהל עסקים — פיננסים." /></Label>
               <Input
                 className="mt-1"
                 placeholder="מנהל עסקים — פיננסים"

@@ -9,6 +9,7 @@ import {
   Settings,
   Tag,
   Megaphone,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ const navItems = [
   { href: '/initiatives', label: 'מהלכים שיווקיים', icon: Megaphone },
   { href: '/settings/slugs', label: 'ניהול סלאגים', icon: Tag },
   { href: '/settings', label: 'הגדרות', icon: Settings },
+  { href: '/help', label: 'עזרה ותמיכה', icon: HelpCircle },
 ];
 
 export function Sidebar() {

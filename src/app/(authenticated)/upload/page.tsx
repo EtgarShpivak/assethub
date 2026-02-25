@@ -19,6 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES } from '@/lib/platform-specs';
 import { computeFileSizeLabel } from '@/lib/aspect-ratio';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Slug, Initiative } from '@/lib/types';
 
 interface FileEntry {
@@ -146,6 +147,7 @@ export default function UploadPage() {
       <div className="flex items-center gap-3">
         <UploadIcon className="w-6 h-6 text-ono-green" />
         <h1 className="text-2xl font-bold text-ono-gray-dark">העלאת חומרים</h1>
+        <InfoTooltip text="העלו קבצים חדשים למערכת. גררו קבצים לאזור ההעלאה או לחצו לבחירה מהמחשב. קבצי ZIP ייפתחו אוטומטית." size="md" />
       </div>
 
       {/* Drop zone */}
@@ -221,7 +223,7 @@ export default function UploadPage() {
             )}
 
             <div>
-              <Label>סלאג *</Label>
+              <Label className="flex items-center gap-1">סלאג * <InfoTooltip text="הסלאג מייצג את התחום או המחלקה שאליה שייך החומר, למשל: mba, law, cs. חובה לבחור סלאג." /></Label>
               <select value={selectedSlug} onChange={e => { setSelectedSlug(e.target.value); setSelectedInitiative(''); }} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
                 <option value="">בחר סלאג...</option>
                 {slugs.filter(s => !s.is_archived).map(s => (
@@ -231,7 +233,7 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <Label>מהלך שיווקי (אופציונלי)</Label>
+              <Label className="flex items-center gap-1">מהלך שיווקי (אופציונלי) <InfoTooltip text="שייכו את החומר למהלך/קמפיין ספציפי. מוצגים רק מהלכים השייכים לסלאג שנבחר, או מהלכים רוחביים." /></Label>
               <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
                 <option value="">ללא מהלך</option>
                 {filteredInitiatives.map(i => (
@@ -243,14 +245,14 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <Label>סוג חומר</Label>
+              <Label className="flex items-center gap-1">סוג חומר <InfoTooltip text="חומרי הפקה = קבצים מוגמרים מוכנים לשימוש. חומרי מקור = קבצי עיצוב מקוריים. טיוטות = גרסאות ביניים." /></Label>
               <select value={assetType} onChange={e => setAssetType(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
                 {ASSET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
 
             <div>
-              <Label>הקשר תחומי</Label>
+              <Label className="flex items-center gap-1">הקשר תחומי <InfoTooltip text="מגדיר את סוג השימוש: סושיאל, דיספליי, דפוס, מיתוג או פנימי. עוזר לסנן ולארגן חומרים." /></Label>
               <select value={domainContext} onChange={e => setDomainContext(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
                 <option value="">בחר...</option>
                 {DOMAIN_CONTEXTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
@@ -258,14 +260,14 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <Label>תאריך מסמך</Label>
+              <Label className="flex items-center gap-1">תאריך מסמך <InfoTooltip text="תאריך המסמך המקורי. ברירת מחדל: היום. ניתן לשנות לתאריך ישן יותר אם מעלים חומר ישן." /></Label>
               <Input type="date" className="mt-1" value={uploadDate} onChange={e => setUploadDate(e.target.value)} />
               <p className="text-[10px] text-ono-gray mt-0.5">ברירת מחדל: היום. ניתן לשנות.</p>
             </div>
           </div>
 
           <div>
-            <Label className="mb-2 block">פלטפורמות</Label>
+            <Label className="mb-2 flex items-center gap-1">פלטפורמות <InfoTooltip text="סמנו את הפלטפורמות שבהן החומר ישמש: META, Google Ads, TikTok, LinkedIn. ניתן לבחור מספר פלטפורמות." /></Label>
             <div className="flex flex-wrap gap-3">
               {PLATFORMS.map(p => (
                 <label key={p.value} className="flex items-center gap-2 cursor-pointer">
@@ -277,7 +279,7 @@ export default function UploadPage() {
           </div>
 
           <div>
-            <Label>תגיות (מופרדות בפסיקים)</Label>
+            <Label className="flex items-center gap-1">תגיות (מופרדות בפסיקים) <InfoTooltip text="הוסיפו מילות מפתח לחיפוש מהיר. הפרידו בפסיקים, למשל: קיץ 2025, קמפוס, תלמידים." /></Label>
             <Input className="mt-1" placeholder="קיץ 2025, קמפוס, תלמידים" value={tagsInput} onChange={e => setTagsInput(e.target.value)} />
           </div>
 
