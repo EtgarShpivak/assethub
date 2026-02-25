@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient, isAdminUser } from '@/lib/supabase/server';
+import { createServiceRoleClient, isAdminUser, getAuthUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,6 +132,18 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'user_id required' }, { status: 400 });
   }
 
+  // Prevent modifying another admin's role (admins can only be modified by themselves)
+  const { data: targetUser } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user_id)
+    .single();
+
+  const currentUser = await getAuthUser();
+  if (targetUser?.role === 'admin' && user_id !== currentUser?.id) {
+    return NextResponse.json({ error: 'לא ניתן לשנות הרשאות של מנהל מערכת אחר' }, { status: 403 });
+  }
+
   const updateData: Record<string, unknown> = {};
   if (role !== undefined) updateData.role = role;
   if (permissions !== undefined) updateData.permissions = permissions;
@@ -148,4 +160,60 @@ export async function PATCH(request: NextRequest) {
   }
 
   return NextResponse.json({ updated: true });
+}
+
+// DELETE - remove a non-admin user from the system (admin only)
+export async function DELETE(request: NextRequest) {
+  const admin = await isAdminUser();
+  if (!admin) {
+    return NextResponse.json({ error: 'אין הרשאה' }, { status: 403 });
+  }
+
+  const supabase = createServiceRoleClient();
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('user_id');
+
+  if (!userId) {
+    return NextResponse.json({ error: 'user_id required' }, { status: 400 });
+  }
+
+  // Prevent deleting yourself
+  const currentUser = await getAuthUser();
+  if (userId === currentUser?.id) {
+    return NextResponse.json({ error: 'לא ניתן למחוק את עצמך' }, { status: 400 });
+  }
+
+  // Prevent deleting another admin
+  const { data: targetUser } = await supabase
+    .from('user_profiles')
+    .select('role, email')
+    .eq('id', userId)
+    .single();
+
+  if (!targetUser) {
+    return NextResponse.json({ error: 'משתמש לא נמצא' }, { status: 404 });
+  }
+
+  if (targetUser.role === 'admin') {
+    return NextResponse.json({ error: 'לא ניתן למחוק מנהל מערכת. ניתן רק להשבית אותו.' }, { status: 403 });
+  }
+
+  // Delete profile first
+  const { error: profileError } = await supabase
+    .from('user_profiles')
+    .delete()
+    .eq('id', userId);
+
+  if (profileError) {
+    return NextResponse.json({ error: profileError.message }, { status: 500 });
+  }
+
+  // Delete from Supabase Auth
+  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+  if (authError) {
+    console.error('Auth deletion error (profile already deleted):', authError);
+    // Profile was already deleted, just log the auth error
+  }
+
+  return NextResponse.json({ deleted: true, email: targetUser.email });
 }

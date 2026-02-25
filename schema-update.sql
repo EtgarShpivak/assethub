@@ -79,5 +79,14 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS view_filters JSONB DEFAULT NU
 ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_role_check;
 
 -- ============================================
+-- 8. Ensure super admin for etgar.shpivak@gmail.com
+-- ============================================
+UPDATE user_profiles
+SET role = 'admin',
+    permissions = '{"can_upload": true, "can_view": true, "can_manage_initiatives": true}'::jsonb,
+    is_active = true
+WHERE email = 'etgar.shpivak@gmail.com';
+
+-- ============================================
 -- Done! All schema updates applied.
 -- ============================================

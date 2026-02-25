@@ -17,6 +17,8 @@ import {
   CheckCircle,
   XCircle,
   Mail,
+  AlertTriangle,
+  UserMinus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,6 +101,11 @@ export default function SettingsPage() {
     can_view_filtered: false,
   });
   const [editSaving, setEditSaving] = useState(false);
+
+  // Delete user confirmation
+  const [deleteUser, setDeleteUser] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Token form
   const [tokenWorkspace, setTokenWorkspace] = useState('');
@@ -250,6 +257,26 @@ export default function SettingsPage() {
     fetchData();
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteUser) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`/api/users?user_id=${deleteUser.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteError(data.error || 'שגיאה במחיקת המשתמש');
+        setDeleting(false);
+        return;
+      }
+      setDeleteUser(null);
+      fetchData();
+    } catch {
+      setDeleteError('שגיאה במחיקת המשתמש');
+    }
+    setDeleting(false);
+  };
+
   const filteredInitiatives = tokenSlug
     ? initiatives.filter((i) => i.slug_id === tokenSlug)
     : initiatives;
@@ -330,6 +357,12 @@ export default function SettingsPage() {
                         <Button variant="ghost" size="sm" onClick={() => handleToggleActive(user.id, user.is_active !== false)} title={user.is_active !== false ? 'השבת' : 'הפעל'}>
                           {user.is_active !== false ? <XCircle className="w-4 h-4 text-red-400" /> : <CheckCircle className="w-4 h-4 text-ono-green" />}
                         </Button>
+                        {/* Only non-admins can be fully deleted */}
+                        {user.role !== 'admin' && (
+                          <Button variant="ghost" size="sm" onClick={() => { setDeleteUser(user); setDeleteError(''); }} title="הסר מהמערכת">
+                            <UserMinus className="w-4 h-4 text-red-600" />
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>
@@ -548,6 +581,39 @@ export default function SettingsPage() {
             <Button variant="outline" onClick={() => setShowTokenModal(false)}>ביטול</Button>
             <Button onClick={handleCreateToken} disabled={saving || !tokenSlug} className="bg-ono-green hover:bg-ono-green-dark text-white">
               {saving ? 'יוצר...' : 'צור קישור'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Modal */}
+      <Dialog open={!!deleteUser} onOpenChange={() => setDeleteUser(null)}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              הסרת משתמש מהמערכת
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <p className="text-sm text-ono-gray-dark">
+              האם אתה בטוח שברצונך להסיר את <strong>{deleteUser?.display_name || deleteUser?.email}</strong> מהמערכת?
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-xs text-red-700 font-medium mb-1">פעולה זו תמחק לצמיתות:</p>
+              <ul className="text-xs text-red-600 space-y-0.5 list-disc list-inside">
+                <li>את חשבון המשתמש</li>
+                <li>את כל ההרשאות שלו</li>
+                <li>את הגישה שלו למערכת</li>
+              </ul>
+            </div>
+            <p className="text-xs text-ono-gray">חומרים שהועלו על ידי משתמש זה יישארו במערכת.</p>
+            {deleteError && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{deleteError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUser(null)}>ביטול</Button>
+            <Button onClick={handleDeleteUser} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
+              {deleting ? 'מוחק...' : 'הסר משתמש'}
             </Button>
           </DialogFooter>
         </DialogContent>
