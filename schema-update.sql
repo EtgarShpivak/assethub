@@ -30,27 +30,19 @@ CREATE TABLE IF NOT EXISTS saved_searches (
 
 ALTER TABLE saved_searches ENABLE ROW LEVEL SECURITY;
 
--- Saved searches policies (safe to re-run)
-DO $$ BEGIN
-  CREATE POLICY "Users see own searches" ON saved_searches FOR SELECT USING (user_id = auth.uid());
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-DO $$ BEGIN
-  CREATE POLICY "Users create own searches" ON saved_searches FOR INSERT WITH CHECK (user_id = auth.uid());
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-DO $$ BEGIN
-  CREATE POLICY "Users update own searches" ON saved_searches FOR UPDATE USING (user_id = auth.uid());
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-DO $$ BEGIN
-  CREATE POLICY "Users delete own searches" ON saved_searches FOR DELETE USING (user_id = auth.uid());
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-DO $$ BEGIN
-  CREATE POLICY "Service role full access searches" ON saved_searches FOR ALL USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- Drop existing policies first (safe even if they don't exist)
+DROP POLICY IF EXISTS "Users see own searches" ON saved_searches;
+DROP POLICY IF EXISTS "Users create own searches" ON saved_searches;
+DROP POLICY IF EXISTS "Users update own searches" ON saved_searches;
+DROP POLICY IF EXISTS "Users delete own searches" ON saved_searches;
+DROP POLICY IF EXISTS "Service role full access searches" ON saved_searches;
+
+-- Recreate policies
+CREATE POLICY "Users see own searches" ON saved_searches FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Users create own searches" ON saved_searches FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Users update own searches" ON saved_searches FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "Users delete own searches" ON saved_searches FOR DELETE USING (user_id = auth.uid());
+CREATE POLICY "Service role full access searches" ON saved_searches FOR ALL USING (true);
 
 -- ============================================
 -- 6. Share Links table
@@ -71,10 +63,8 @@ CREATE INDEX IF NOT EXISTS idx_share_links_expires ON share_links(expires_at);
 
 ALTER TABLE share_links ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-  CREATE POLICY "Service role full access shares" ON share_links FOR ALL USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+DROP POLICY IF EXISTS "Service role full access shares" ON share_links;
+CREATE POLICY "Service role full access shares" ON share_links FOR ALL USING (true);
 
 -- ============================================
 -- 7. User Roles & Permissions system
@@ -85,11 +75,8 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS invited_by UUID;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS view_filters JSONB DEFAULT NULL;
 
--- Update role check to include 'viewer'
-DO $$ BEGIN
-  ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_role_check;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
+-- Update role check constraint
+ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_role_check;
 
 -- ============================================
 -- Done! All schema updates applied.
