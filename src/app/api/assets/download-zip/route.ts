@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import archiver from 'archiver';
-import { PassThrough, Readable } from 'stream';
+import JSZip from 'jszip';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const supabase = createServiceRoleClient();
@@ -28,10 +28,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'שגיאה בטעינת חומרים' }, { status: 500 });
   }
 
-  // Create ZIP archive
-  const archive = archiver('zip', { zlib: { level: 5 } });
-  const passthrough = new PassThrough();
-  archive.pipe(passthrough);
+  // Create ZIP using JSZip (works on Vercel serverless)
+  const zip = new JSZip();
 
   // Track filenames to avoid duplicates
   const usedNames = new Map<string, number>();
@@ -60,21 +58,22 @@ export async function POST(request: NextRequest) {
       usedNames.set(asset.original_filename, count + 1);
 
       const arrayBuffer = await fileData.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const readable = Readable.from(buffer);
-
-      archive.append(readable, { name: filename });
+      zip.file(filename, arrayBuffer);
     } catch (err) {
       console.error(`Failed to fetch file ${asset.drive_file_id}:`, err);
     }
   }
 
-  await archive.finalize();
+  const zipBuffer = await zip.generateAsync({
+    type: 'arraybuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 5 },
+  });
 
   const headers = new Headers();
   headers.set('Content-Type', 'application/zip');
   headers.set('Content-Disposition', `attachment; filename="assethub_download_${Date.now()}.zip"`);
+  headers.set('Content-Length', zipBuffer.byteLength.toString());
 
-  // @ts-expect-error PassThrough is a readable stream
-  return new NextResponse(passthrough, { headers });
+  return new NextResponse(zipBuffer, { headers });
 }
