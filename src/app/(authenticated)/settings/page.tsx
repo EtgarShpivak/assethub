@@ -122,13 +122,26 @@ export default function SettingsPage() {
     });
   }, []);
 
+  // Fetch current user's profile to determine role (any authenticated user can call this)
+  const fetchMyProfile = async () => {
+    try {
+      const res = await fetch('/api/users/me');
+      if (res.ok) {
+        const profile = await res.json();
+        setCurrentUser(profile);
+      }
+    } catch {
+      // Fallback: will try to get from users list
+    }
+  };
+
   const fetchData = () => {
     const promises: Promise<unknown>[] = [
       fetch('/api/upload-tokens').then((r) => r.json()),
       fetch('/api/slugs').then((r) => r.json()),
       fetch('/api/initiatives').then((r) => r.json()),
       fetch('/api/workspaces').then((r) => r.json()),
-      fetch('/api/users').then((r) => r.json()),
+      fetch('/api/users').then((r) => r.json()).catch(() => []),
     ];
 
     Promise.all(promises).then(([tk, sl, ini, ws, usr]) => {
@@ -138,7 +151,8 @@ export default function SettingsPage() {
       setWorkspaces(ws as { id: string; name: string }[]);
       const usersList = Array.isArray(usr) ? (usr as UserProfile[]) : [];
       setUsers(usersList);
-      if (currentUserId) {
+      // If we already have currentUser from /me endpoint, don't overwrite
+      if (currentUserId && !currentUser) {
         const me = usersList.find(u => u.id === currentUserId);
         if (me) setCurrentUser(me);
       }
@@ -148,7 +162,10 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    if (currentUserId) fetchData();
+    if (currentUserId) {
+      fetchMyProfile();
+      fetchData();
+    }
   }, [currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreateToken = async () => {
