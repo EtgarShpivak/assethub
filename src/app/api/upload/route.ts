@@ -22,22 +22,49 @@ const ALLOWED_MIMES = new Set([
   'video/mp4', 'video/quicktime', 'video/webm',
   'application/pdf',
   'application/zip', 'application/x-zip-compressed',
+  // Newsletter/brochure formats
+  'application/x-indesign',
+  'application/postscript',
+  'application/illustrator',
+  'application/vnd.ms-publisher',
+  'text/html',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/msword',
+]);
+
+// Extensions recognized as newsletter/brochure
+const NEWSLETTER_EXTENSIONS = new Set([
+  'indd', 'ai', 'eps', 'pub', 'html', 'htm',
+  'pptx', 'ppt', 'docx', 'doc', 'idml',
 ]);
 
 const EXTRACTABLE_EXTENSIONS = new Set([
   'jpg', 'jpeg', 'png', 'gif', 'webp',
   'mp4', 'mov', 'webm',
   'pdf',
+  // Newsletter formats in ZIP
+  'indd', 'ai', 'eps', 'pub', 'html', 'htm',
+  'pptx', 'ppt', 'docx', 'doc', 'idml',
 ]);
 
 function getFileType(mime: string, filename?: string): 'image' | 'video' | 'pdf' | 'newsletter' | 'other' {
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime === 'application/pdf') return 'pdf';
-  // Check for common newsletter/brochure formats
+  // Check for newsletter/brochure formats by extension first
   const ext = filename?.split('.').pop()?.toLowerCase() || '';
-  if (['indd', 'ai', 'eps', 'pub'].includes(ext)) return 'newsletter';
+  if (NEWSLETTER_EXTENSIONS.has(ext)) return 'newsletter';
+  if (mime === 'text/html') return 'newsletter';
+  if (mime.includes('indesign') || mime.includes('publisher') || mime.includes('illustrator')) return 'newsletter';
   return 'other';
+}
+
+// Check if a file with generic mime type should be allowed based on extension
+function isAllowedByExtension(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return NEWSLETTER_EXTENSIONS.has(ext);
 }
 
 function guessMimeType(filename: string): string {
@@ -47,6 +74,13 @@ function guessMimeType(filename: string): string {
     gif: 'image/gif', webp: 'image/webp',
     mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
     pdf: 'application/pdf',
+    indd: 'application/x-indesign', ai: 'application/postscript',
+    eps: 'application/postscript', pub: 'application/vnd.ms-publisher',
+    html: 'text/html', htm: 'text/html',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ppt: 'application/vnd.ms-powerpoint',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc: 'application/msword', idml: 'application/octet-stream',
   };
   return mimeMap[ext] || 'application/octet-stream';
 }
@@ -77,6 +111,7 @@ export async function POST(request: NextRequest) {
   const uploadedBy = formData.get('uploaded_by') as string | null;
   const assetType = (formData.get('asset_type') as string) || 'production';
   const customUploadDate = formData.get('upload_date') as string | null;
+  const fileTypeOverride = formData.get('file_type_override') as string | null;
 
   if (!slugId || !workspaceId) {
     return NextResponse.json(
@@ -149,11 +184,15 @@ export async function POST(request: NextRequest) {
       } catch {
         errors.push({ file: file.name, error: 'שגיאה בפתיחת קובץ ZIP' });
       }
-    } else if (ALLOWED_MIMES.has(file.type)) {
+    } else if (ALLOWED_MIMES.has(file.type) || isAllowedByExtension(file.name)) {
+      // Use proper mime type based on extension if browser sent generic type
+      const mimeType = (file.type === 'application/octet-stream' || !file.type)
+        ? guessMimeType(file.name)
+        : file.type;
       filesToProcess.push({
         name: file.name,
         buffer,
-        mimeType: file.type,
+        mimeType,
         size: file.size,
       });
     } else {
@@ -167,7 +206,10 @@ export async function POST(request: NextRequest) {
 
   for (const file of filesToProcess) {
     try {
-      const fileType = getFileType(file.mimeType, file.name);
+      // Use manual override if provided, otherwise auto-detect
+      const fileType = (fileTypeOverride && ['image', 'video', 'pdf', 'newsletter', 'other'].includes(fileTypeOverride))
+        ? fileTypeOverride as 'image' | 'video' | 'pdf' | 'newsletter' | 'other'
+        : getFileType(file.mimeType, file.name);
 
       // Extract dimensions for images
       let width: number | null = null;

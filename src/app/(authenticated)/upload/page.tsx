@@ -13,6 +13,7 @@ import {
   Package,
   Plus,
   Globe,
+  Newspaper,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +27,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES, containsHebrew } from '@/lib/platform-specs';
+import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES, FILE_TYPES, containsHebrew } from '@/lib/platform-specs';
 import { computeFileSizeLabel } from '@/lib/aspect-ratio';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Slug, Initiative } from '@/lib/types';
@@ -38,11 +39,18 @@ interface FileEntry {
   type: string;
 }
 
-function FileTypeIcon({ type }: { type: string }) {
+const NEWSLETTER_EXTS = new Set(['indd', 'ai', 'eps', 'pub', 'html', 'htm', 'pptx', 'ppt', 'docx', 'doc', 'idml']);
+
+function FileTypeIcon({ type, filename }: { type: string; filename?: string }) {
   if (type.startsWith('image/')) return <ImageIcon className="w-5 h-5 text-ono-green" />;
   if (type.startsWith('video/')) return <Film className="w-5 h-5 text-platform-meta" />;
   if (type === 'application/pdf') return <FileText className="w-5 h-5 text-platform-google" />;
   if (type.includes('zip')) return <Package className="w-5 h-5 text-ono-orange" />;
+  // Check newsletter by extension
+  const ext = filename?.split('.').pop()?.toLowerCase() || '';
+  if (NEWSLETTER_EXTS.has(ext) || type.includes('indesign') || type.includes('publisher') || type === 'text/html') {
+    return <Newspaper className="w-5 h-5 text-ono-orange" />;
+  }
   return <File className="w-5 h-5 text-ono-gray" />;
 }
 
@@ -59,6 +67,7 @@ export default function UploadPage() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [tagsInput, setTagsInput] = useState('');
   const [assetType, setAssetType] = useState('production');
+  const [fileTypeOverride, setFileTypeOverride] = useState('');
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [uploading, setUploading] = useState(false);
@@ -135,6 +144,7 @@ export default function UploadPage() {
     if (domainContext) formData.append('domain_context', domainContext);
     if (selectedPlatforms.length > 0) formData.append('platforms', JSON.stringify(selectedPlatforms));
     if (tagsInput) formData.append('tags', tagsInput);
+    if (fileTypeOverride) formData.append('file_type_override', fileTypeOverride);
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -233,13 +243,13 @@ export default function UploadPage() {
       >
         <UploadIcon className="w-12 h-12 text-ono-green mx-auto mb-4" />
         <p className="text-ono-gray-dark font-medium mb-1">גררו קבצים לכאן או לחצו לבחירה</p>
-        <p className="text-sm text-ono-gray">JPG, PNG, MP4, MOV, GIF, PDF, ZIP — עד 2GB לקובץ</p>
-        <p className="text-xs text-ono-orange mt-2">קבצי ZIP ייפתחו אוטומטית — כל קובץ תמונה/וידאו/PDF בתוכם יועלה בנפרד</p>
+        <p className="text-sm text-ono-gray">תמונות, וידאו, PDF, ידיעונים (InDesign, AI, HTML, PPTX, DOCX), ZIP — עד 2GB</p>
+        <p className="text-xs text-ono-orange mt-2">קבצי ZIP ייפתחו אוטומטית — כל קובץ מוכר בתוכם יועלה בנפרד</p>
         <input
           id="file-input"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.webm,.pdf,.zip"
+          accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.webm,.pdf,.zip,.indd,.ai,.eps,.pub,.html,.htm,.pptx,.ppt,.docx,.doc,.idml"
           className="hidden"
           onChange={handleFileInput}
         />
@@ -263,7 +273,7 @@ export default function UploadPage() {
             {files.map((f, i) => (
               <div key={i} className="flex items-center justify-between px-4 py-2.5">
                 <div className="flex items-center gap-3">
-                  <FileTypeIcon type={f.type} />
+                  <FileTypeIcon type={f.type} filename={f.name} />
                   <div>
                     <p className="text-sm text-ono-gray-dark">{f.name}</p>
                     <p className="text-xs text-ono-gray">{computeFileSizeLabel(f.size)}</p>
@@ -334,6 +344,14 @@ export default function UploadPage() {
               <Label className="flex items-center gap-1">סוג חומר <InfoTooltip text="חומרי הפקה = קבצים מוגמרים מוכנים לשימוש. חומרי מקור = קבצי עיצוב מקוריים. טיוטות = גרסאות ביניים." /></Label>
               <select value={assetType} onChange={e => setAssetType(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
                 {ASSET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-1">סוג קובץ <InfoTooltip text="בד&quot;כ המערכת מזהה אוטומטית. בחרו &quot;ידיעונים וברושורים&quot; כדי לסווג ידנית קבצים כמו ניוזלטרים, ברושורים, עלוני מידע." /></Label>
+              <select value={fileTypeOverride} onChange={e => setFileTypeOverride(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">זיהוי אוטומטי</option>
+                {FILE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
 
