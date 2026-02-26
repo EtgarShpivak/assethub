@@ -90,6 +90,8 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [copiedInviteLink, setCopiedInviteLink] = useState(false);
 
   // Edit user modal
   const [editUser, setEditUser] = useState<UserProfile | null>(null);
@@ -211,6 +213,8 @@ export default function SettingsPage() {
     setInviting(true);
     setInviteError('');
     setInviteSuccess('');
+    setInviteLink('');
+    setCopiedInviteLink(false);
 
     try {
       const res = await fetch('/api/users', {
@@ -227,7 +231,10 @@ export default function SettingsPage() {
       if (!res.ok) {
         setInviteError(data.error || 'שגיאה בהזמנה');
       } else {
-        setInviteSuccess(`המשתמש ${inviteEmail} ${data.updated ? 'עודכן' : 'הוזמן'} בהצלחה. הזמנה נשלחה למייל.`);
+        setInviteSuccess(`המשתמש ${inviteEmail} ${data.updated ? 'עודכן' : 'הוזמן'} בהצלחה!`);
+        if (data.invite_link) {
+          setInviteLink(data.invite_link);
+        }
         setInviteEmail('');
         fetchData();
       }
@@ -235,6 +242,14 @@ export default function SettingsPage() {
       setInviteError('שגיאה בהזמנת המשתמש');
     }
     setInviting(false);
+  };
+
+  const copyInviteLink = () => {
+    if (inviteLink) {
+      navigator.clipboard.writeText(inviteLink);
+      setCopiedInviteLink(true);
+      setTimeout(() => setCopiedInviteLink(false), 3000);
+    }
   };
 
   const handleEditUser = (user: UserProfile) => {
@@ -321,7 +336,7 @@ export default function SettingsPage() {
               <Badge variant="outline" className="text-xs">{users.length}</Badge>
               <InfoTooltip text="הזמינו משתמשים חדשים, הגדירו תפקידים והרשאות, והשביתו גישה למשתמשים שאינם פעילים." />
             </div>
-            <Button onClick={() => { setShowInviteModal(true); setInviteError(''); setInviteSuccess(''); }} className="bg-ono-green hover:bg-ono-green-dark text-white" size="sm">
+            <Button onClick={() => { setShowInviteModal(true); setInviteError(''); setInviteSuccess(''); setInviteLink(''); setCopiedInviteLink(false); }} className="bg-ono-green hover:bg-ono-green-dark text-white" size="sm">
               <UserPlus className="w-4 h-4 ml-1" />
               הזמן משתמש
             </Button>
@@ -498,13 +513,40 @@ export default function SettingsPage() {
               </div>
             </div>
             {inviteError && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{inviteError}</p>}
-            {inviteSuccess && <p className="text-sm text-ono-green-dark bg-ono-green-light p-2 rounded">{inviteSuccess}</p>}
+            {inviteSuccess && (
+              <div className="space-y-2">
+                <p className="text-sm text-ono-green-dark bg-ono-green-light p-2 rounded">{inviteSuccess}</p>
+                {inviteLink && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-xs text-blue-700 font-medium mb-2">שלח את הקישור הבא למשתמש:</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        dir="ltr"
+                        readOnly
+                        value={inviteLink}
+                        className="text-xs text-left bg-white flex-1"
+                        onClick={copyInviteLink}
+                      />
+                      <Button size="sm" variant="outline" onClick={copyInviteLink} className="shrink-0">
+                        <Copy className="w-3.5 h-3.5 ml-1" />
+                        {copiedInviteLink ? 'הועתק!' : 'העתק'}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-blue-600 mt-1.5">הקישור הזה חד-פעמי. המשתמש ילחץ עליו ויגדיר סיסמה.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInviteModal(false)}>ביטול</Button>
-            <Button onClick={handleInviteUser} disabled={inviting || !inviteEmail} className="bg-ono-green hover:bg-ono-green-dark text-white">
-              {inviting ? 'שולח...' : 'הזמן משתמש'}
+            <Button variant="outline" onClick={() => { setShowInviteModal(false); setInviteLink(''); setInviteSuccess(''); }}>
+              {inviteLink ? 'סגור' : 'ביטול'}
             </Button>
+            {!inviteLink && (
+              <Button onClick={handleInviteUser} disabled={inviting || !inviteEmail} className="bg-ono-green hover:bg-ono-green-dark text-white">
+                {inviting ? 'שולח...' : 'הזמן משתמש'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

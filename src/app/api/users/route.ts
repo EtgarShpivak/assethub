@@ -40,12 +40,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'כתובת מייל נדרשת' }, { status: 400 });
   }
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://assethub-seven.vercel.app';
+
   // Check if user already exists in auth
   const { data: existingUsers } = await supabase.auth.admin.listUsers();
   const existingUser = existingUsers?.users?.find(u => u.email === email);
 
   if (existingUser) {
-    // User exists in auth — update their profile and re-send invite
+    // User exists in auth — update their profile and generate a new invite link
     const { error: updateError } = await supabase
       .from('user_profiles')
       .upsert({
@@ -63,30 +65,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    // Re-send invitation email via magic link
-    const { error: resendError } = await supabase.auth.admin.generateLink({
+    // Generate a magic link for existing user
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email,
     });
 
-    if (resendError) {
-      console.error('Resend invite error:', resendError);
+    let inviteLink = '';
+    if (!linkError && linkData?.properties?.hashed_token) {
+      inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=magiclink`;
     }
 
-    return NextResponse.json({ id: existingUser.id, updated: true });
+    return NextResponse.json({ id: existingUser.id, updated: true, invite_link: inviteLink });
   }
 
-  // New user: use inviteUserByEmail which creates the user AND sends invitation email
-  const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://assethub-seven.vercel.app'}/auth/callback`,
+  // New user: create user with temp password, then generate invite link
+  const tempPassword = crypto.randomUUID().slice(0, 16) + 'A1!';
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    email,
+    password: tempPassword,
+    email_confirm: true, // Mark email as confirmed so they can log in after setting password
   });
 
-  if (inviteError) {
-    console.error('Invite error:', inviteError);
-    return NextResponse.json({ error: `שגיאה בשליחת הזמנה: ${inviteError.message}` }, { status: 500 });
+  if (authError) {
+    console.error('Create user error:', authError);
+    return NextResponse.json({ error: `שגיאה ביצירת משתמש: ${authError.message}` }, { status: 500 });
   }
 
-  if (!inviteData.user) {
+  if (!authData.user) {
     return NextResponse.json({ error: 'שגיאה ביצירת משתמש' }, { status: 500 });
   }
 
@@ -102,7 +108,7 @@ export async function POST(request: NextRequest) {
   const { error: profileError } = await supabase
     .from('user_profiles')
     .insert({
-      id: inviteData.user.id,
+      id: authData.user.id,
       display_name: email.split('@')[0],
       email,
       role: role || 'viewer',
@@ -118,7 +124,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: profileError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ id: inviteData.user.id, created: true }, { status: 201 });
+  // Generate invite link (recovery type so user can set their own password)
+  const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    type: 'recovery',
+    email,
+  });
+
+  let inviteLink = '';
+  if (!linkError && linkData?.properties?.hashed_token) {
+    inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`;
+  }
+
+  return NextResponse.json({ id: authData.user.id, created: true, invite_link: inviteLink }, { status: 201 });
 }
 
 // PATCH - update user permissions (admin only)
