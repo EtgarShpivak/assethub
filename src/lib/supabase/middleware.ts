@@ -5,7 +5,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Allow public routes FIRST (before any Supabase calls)
-  const publicPaths = ['/login', '/auth/callback'];
+  const publicPaths = ['/login', '/auth/callback', '/set-password'];
   const isExternalUpload = path.startsWith('/upload/') && path.split('/').length === 3 && path !== '/upload';
   const isSharedLink = path.startsWith('/shared/');
   const isPublicApi =

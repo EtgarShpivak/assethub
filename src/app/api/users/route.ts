@@ -40,42 +40,53 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'כתובת מייל נדרשת' }, { status: 400 });
   }
 
-  // Create user via Supabase Auth admin API
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-    email,
-    password: Math.random().toString(36).slice(-12) + 'A1!',  // Temp password
-    email_confirm: true,
-  });
+  // Check if user already exists in auth
+  const { data: existingUsers } = await supabase.auth.admin.listUsers();
+  const existingUser = existingUsers?.users?.find(u => u.email === email);
 
-  if (authError) {
-    // User might already exist
-    if (authError.message.includes('already been registered')) {
-      // Get existing user
-      const { data: existingUsers } = await supabase.auth.admin.listUsers();
-      const existingUser = existingUsers?.users?.find(u => u.email === email);
-      if (existingUser) {
-        // Update their profile
-        const { error: updateError } = await supabase
-          .from('user_profiles')
-          .update({
-            role: role || 'viewer',
-            permissions: permissions || {},
-            view_filters: view_filters || null,
-            is_active: true,
-          })
-          .eq('id', existingUser.id);
+  if (existingUser) {
+    // User exists in auth — update their profile and re-send invite
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .upsert({
+        id: existingUser.id,
+        display_name: existingUser.user_metadata?.full_name || email.split('@')[0],
+        email,
+        role: role || 'viewer',
+        permissions: permissions || {},
+        view_filters: view_filters || null,
+        is_active: true,
+        invited_by: invited_by || null,
+      });
 
-        if (updateError) {
-          return NextResponse.json({ error: updateError.message }, { status: 500 });
-        }
-
-        return NextResponse.json({ id: existingUser.id, updated: true });
-      }
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
-    return NextResponse.json({ error: authError.message }, { status: 500 });
+
+    // Re-send invitation email via magic link
+    const { error: resendError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+    });
+
+    if (resendError) {
+      console.error('Resend invite error:', resendError);
+    }
+
+    return NextResponse.json({ id: existingUser.id, updated: true });
   }
 
-  if (!authData.user) {
+  // New user: use inviteUserByEmail which creates the user AND sends invitation email
+  const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://assethub-seven.vercel.app'}/auth/callback`,
+  });
+
+  if (inviteError) {
+    console.error('Invite error:', inviteError);
+    return NextResponse.json({ error: `שגיאה בשליחת הזמנה: ${inviteError.message}` }, { status: 500 });
+  }
+
+  if (!inviteData.user) {
     return NextResponse.json({ error: 'שגיאה ביצירת משתמש' }, { status: 500 });
   }
 
@@ -91,7 +102,7 @@ export async function POST(request: NextRequest) {
   const { error: profileError } = await supabase
     .from('user_profiles')
     .insert({
-      id: authData.user.id,
+      id: inviteData.user.id,
       display_name: email.split('@')[0],
       email,
       role: role || 'viewer',
@@ -107,13 +118,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: profileError.message }, { status: 500 });
   }
 
-  // Send password reset so user can set their own password
-  await supabase.auth.admin.generateLink({
-    type: 'recovery',
-    email,
-  });
-
-  return NextResponse.json({ id: authData.user.id, created: true }, { status: 201 });
+  return NextResponse.json({ id: inviteData.user.id, created: true }, { status: 201 });
 }
 
 // PATCH - update user permissions (admin only)

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   // Check if profile exists
   const { data: existing } = await supabase
     .from('user_profiles')
-    .select('id')
+    .select('id, is_active')
     .eq('id', user_id)
     .single();
 
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (email) {
       await supabase.from('user_profiles').update({ email }).eq('id', user_id).is('email', null);
     }
-    return NextResponse.json({ exists: true });
+    return NextResponse.json({ exists: true, inactive: existing.is_active === false });
   }
 
   // Get the first workspace to auto-assign

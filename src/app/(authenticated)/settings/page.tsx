@@ -227,7 +227,7 @@ export default function SettingsPage() {
       if (!res.ok) {
         setInviteError(data.error || 'שגיאה בהזמנה');
       } else {
-        setInviteSuccess(`המשתמש ${inviteEmail} ${data.updated ? 'עודכן' : 'הוזמן'} בהצלחה`);
+        setInviteSuccess(`המשתמש ${inviteEmail} ${data.updated ? 'עודכן' : 'הוזמן'} בהצלחה. הזמנה נשלחה למייל.`);
         setInviteEmail('');
         fetchData();
       }
@@ -459,7 +459,7 @@ export default function SettingsPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label className="flex items-center gap-1">כתובת מייל * <InfoTooltip text="כתובת המייל שתשמש לכניסה למערכת. המשתמש יקבל הזמנה לאיפוס סיסמה." /></Label>
+              <Label className="flex items-center gap-1">כתובת מייל * <InfoTooltip text="כתובת המייל שתשמש לכניסה למערכת. המשתמש יקבל הזמנה במייל עם קישור לקביעת סיסמה." /></Label>
               <Input dir="ltr" className="mt-1 text-left" placeholder="user@example.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
             </div>
             <div>
