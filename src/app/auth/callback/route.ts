@@ -28,22 +28,24 @@ export async function GET(request: Request) {
     }
   );
 
-  // Handle invite/recovery token (from email links)
+  // Handle invite/recovery/magiclink token (from email links)
+  // For recovery and invite: redirect to set-password page with token so client can verify + set password
+  // For magiclink: verify server-side and redirect to app
   if (tokenHash && type) {
+    if (type === 'recovery' || type === 'invite') {
+      // Pass token to set-password page — client will verify and set password
+      return NextResponse.redirect(
+        `${origin}/set-password?token_hash=${encodeURIComponent(tokenHash)}&type=${type}`
+      );
+    }
+
+    // For magiclink type: verify server-side and redirect to app
     const { error } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
-      type: type as 'invite' | 'recovery' | 'email',
+      type: type as 'magiclink' | 'email',
     });
 
     if (!error) {
-      // For invite type, redirect to set-password page
-      if (type === 'invite') {
-        return NextResponse.redirect(`${origin}/set-password`);
-      }
-      // For recovery, also redirect to set-password
-      if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/set-password`);
-      }
       return NextResponse.redirect(`${origin}${next}`);
     }
 

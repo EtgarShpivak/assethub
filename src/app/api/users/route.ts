@@ -65,15 +65,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    // Generate a magic link for existing user
+    // Generate a recovery link so user can set their own password
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
+      type: 'recovery',
       email,
     });
 
     let inviteLink = '';
     if (!linkError && linkData?.properties?.hashed_token) {
-      inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=magiclink`;
+      inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`;
     }
 
     return NextResponse.json({ id: existingUser.id, updated: true, invite_link: inviteLink });

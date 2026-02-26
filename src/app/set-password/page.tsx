@@ -1,21 +1,75 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { KeyRound, CheckCircle } from 'lucide-react';
+import { KeyRound, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function SetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-ono-gray-light flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-ono-green animate-spin" />
+      </div>
+    }>
+      <SetPasswordContent />
+    </Suspense>
+  );
+}
+
+function SetPasswordContent() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+  const [verified, setVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // On mount: verify the token from URL to establish a session
+  useEffect(() => {
+    const verifyToken = async () => {
+      const tokenHash = searchParams.get('token_hash');
+      const type = searchParams.get('type');
+
+      if (!tokenHash || !type) {
+        // No token — check if we already have a session (maybe user navigated here directly)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setVerified(true);
+          setVerifying(false);
+          return;
+        }
+        setError('קישור לא תקין. בקש מהאדמין קישור חדש.');
+        setVerifying(false);
+        return;
+      }
+
+      // Verify OTP — this establishes a session in the browser
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: type as 'recovery' | 'invite',
+      });
+
+      if (verifyError) {
+        console.error('Token verify error:', verifyError);
+        setError('הקישור פג תוקף או כבר נוצל. בקש מהאדמין קישור חדש.');
+        setVerifying(false);
+        return;
+      }
+
+      setVerified(true);
+      setVerifying(false);
+    };
+
+    verifyToken();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +136,12 @@ export default function SetPasswordPage() {
           AssetHub
         </h1>
 
-        {success ? (
+        {verifying ? (
+          <div className="text-center py-8">
+            <Loader2 className="w-10 h-10 text-ono-green mx-auto mb-4 animate-spin" />
+            <p className="text-ono-gray">מאמת את הקישור...</p>
+          </div>
+        ) : success ? (
           <div className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-ono-green mx-auto mb-4" />
             <p className="text-lg font-medium text-ono-gray-dark mb-2">
@@ -91,6 +150,19 @@ export default function SetPasswordPage() {
             <p className="text-ono-gray text-sm">
               מעביר אותך למערכת...
             </p>
+          </div>
+        ) : !verified ? (
+          <div className="text-center py-8">
+            <div className="bg-ono-orange-light border border-ono-orange/30 rounded-md p-4 mb-4">
+              <p className="text-sm text-ono-orange">{error}</p>
+            </div>
+            <Button
+              onClick={() => router.push('/login')}
+              variant="outline"
+              className="mt-2"
+            >
+              חזור לדף ההתחברות
+            </Button>
           </div>
         ) : (
           <>
