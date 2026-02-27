@@ -19,6 +19,8 @@ import {
   Clock,
   Shield,
   Film,
+  BarChart3,
+  TrendingUp,
 } from 'lucide-react';
 
 export default function UserGuidePage() {
@@ -269,10 +271,42 @@ export default function UserGuidePage() {
         </div>
       </section>
 
-      {/* Section 8: Quick reference */}
+      {/* Section 8: Analytics */}
       <section className="bg-white border border-[#E8E8E8] rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-4">
         <div className="flex items-center gap-3 border-b border-[#E8E8E8] pb-3">
           <div className="w-8 h-8 bg-ono-green text-white rounded-lg flex items-center justify-center font-bold text-sm">8</div>
+          <h2 className="text-lg font-bold text-ono-gray-dark">אנליטיקות שימוש</h2>
+        </div>
+        <div className="flex items-start gap-3">
+          <BarChart3 className="w-5 h-5 text-ono-green mt-0.5 shrink-0" />
+          <p className="text-sm text-ono-gray-dark leading-relaxed">
+            בדשבורד תמצאו <strong>מדור אנליטיקות</strong> שמציג נתונים על השימוש במערכת. זה עוזר להבין אילו חומרים פופולריים ואיפה יש פערים.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 text-sm">
+            <TrendingUp className="w-4 h-4 text-ono-green mt-0.5 shrink-0" />
+            <span className="text-ono-gray-dark"><strong>מגמת העלאות</strong> - גרף של כמות ההעלאות ב-30 ימים אחרונים</span>
+          </div>
+          <div className="flex items-start gap-2 text-sm">
+            <Download className="w-4 h-4 text-ono-green mt-0.5 shrink-0" />
+            <span className="text-ono-gray-dark"><strong>חומרים מורדים ביותר</strong> - Top 5 חומרים שהורדו הכי הרבה</span>
+          </div>
+          <div className="flex items-start gap-2 text-sm">
+            <Tag className="w-4 h-4 text-ono-green mt-0.5 shrink-0" />
+            <span className="text-ono-gray-dark"><strong>חלוקה לפי סלאג/קמפיין</strong> - כמה חומרים בכל תחום</span>
+          </div>
+          <div className="flex items-start gap-2 text-sm">
+            <Search className="w-4 h-4 text-ono-green mt-0.5 shrink-0" />
+            <span className="text-ono-gray-dark"><strong>חומרים שלא הורדו</strong> - עוזר לזהות חומרים שלא משתמשים בהם</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 9: Quick reference */}
+      <section className="bg-white border border-[#E8E8E8] rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-4">
+        <div className="flex items-center gap-3 border-b border-[#E8E8E8] pb-3">
+          <div className="w-8 h-8 bg-ono-green text-white rounded-lg flex items-center justify-center font-bold text-sm">9</div>
           <h2 className="text-lg font-bold text-ono-gray-dark">מילון מונחים מהיר</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -137,27 +137,33 @@ export default function SettingsPage() {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setUsers(data as UserProfile[]);
+          return data as UserProfile[];
+        }
+      }
+    } catch { /* ignore */ }
+    return [] as UserProfile[];
+  };
+
   const fetchData = () => {
     const promises: Promise<unknown>[] = [
       fetch('/api/upload-tokens').then((r) => r.json()),
       fetch('/api/slugs').then((r) => r.json()),
       fetch('/api/initiatives').then((r) => r.json()),
       fetch('/api/workspaces').then((r) => r.json()),
-      fetch('/api/users').then((r) => r.json()).catch(() => []),
     ];
 
-    Promise.all(promises).then(([tk, sl, ini, ws, usr]) => {
+    Promise.all(promises).then(([tk, sl, ini, ws]) => {
       setTokens(tk as UploadTokenEntry[]);
       setSlugs(sl as Slug[]);
       setInitiatives(ini as Initiative[]);
       setWorkspaces(ws as { id: string; name: string }[]);
-      const usersList = Array.isArray(usr) ? (usr as UserProfile[]) : [];
-      setUsers(usersList);
-      // If we already have currentUser from /me endpoint, don't overwrite
-      if (currentUserId && !currentUser) {
-        const me = usersList.find(u => u.id === currentUserId);
-        if (me) setCurrentUser(me);
-      }
       if ((ws as { id: string }[]).length > 0 && !tokenWorkspace) setTokenWorkspace((ws as { id: string }[])[0].id);
       setLoading(false);
     });
@@ -165,10 +171,20 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (currentUserId) {
-      fetchMyProfile();
+      fetchMyProfile().then(() => {
+        // Fetch users after profile is loaded (so we know admin status)
+        fetchUsers();
+      });
       fetchData();
     }
   }, [currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch users whenever admin status changes to true
+  useEffect(() => {
+    if (isAdmin && users.length === 0 && !loading) {
+      fetchUsers();
+    }
+  }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreateToken = async () => {
     if (!tokenWorkspace || !tokenSlug) return;
@@ -236,7 +252,7 @@ export default function SettingsPage() {
           setInviteLink(data.invite_link);
         }
         setInviteEmail('');
-        fetchData();
+        fetchUsers();
       }
     } catch {
       setInviteError('שגיאה בהזמנת המשתמש');
@@ -277,7 +293,7 @@ export default function SettingsPage() {
     });
     setEditSaving(false);
     setEditUser(null);
-    fetchData();
+    fetchUsers();
   };
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
@@ -286,7 +302,7 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, is_active: !isActive }),
     });
-    fetchData();
+    fetchUsers();
   };
 
   const handleDeleteUser = async () => {
@@ -302,7 +318,7 @@ export default function SettingsPage() {
         return;
       }
       setDeleteUser(null);
-      fetchData();
+      fetchUsers();
     } catch {
       setDeleteError('שגיאה במחיקת המשתמש');
     }

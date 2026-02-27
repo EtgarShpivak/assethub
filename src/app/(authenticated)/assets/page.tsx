@@ -126,7 +126,7 @@ function Toast({ message, type = 'info', onClose }: { message: string; type?: 'i
       {type === 'success' && <CheckCircle className="w-4 h-4" />}
       {type === 'error' && <AlertTriangle className="w-4 h-4" />}
       {message}
-      <button onClick={onClose} className="mr-2 hover:opacity-70"><X className="w-3 h-3" /></button>
+      <button onClick={onClose} className="ml-2 hover:opacity-70"><X className="w-3 h-3" /></button>
     </div>
   );
 }
@@ -178,6 +178,8 @@ export default function AssetLibraryPage() {
 
   const [downloading, setDownloading] = useState(false);
   const [showDownloadConfirm, setShowDownloadConfirm] = useState<{ count: number; action: () => void } | null>(null);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState<Asset | null>(null);
+  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
   const initialLoad = useRef(true);
 
@@ -679,7 +681,7 @@ export default function AssetLibraryPage() {
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray" />
-            <Input className="pr-10" placeholder="חיפוש לפי שם קובץ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <Input className="pr-10" placeholder="חיפוש לפי שם קובץ, הערות או תגיות..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
           <div className="relative w-48">
             <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
@@ -746,7 +748,7 @@ export default function AssetLibraryPage() {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {assets.map(asset => (
-              <div key={asset.id} className={`bg-white border rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden cursor-pointer transition-all hover:border-ono-green ${selectedAssets.has(asset.id) ? 'border-ono-green ring-2 ring-ono-green/20' : 'border-[#E8E8E8]'}`}>
+              <div key={asset.id} className={`group bg-white border rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden cursor-pointer transition-all hover:border-ono-green ${selectedAssets.has(asset.id) ? 'border-ono-green ring-2 ring-ono-green/20' : 'border-[#E8E8E8]'}`}>
                 <div className="relative">
                   <div className="absolute top-2 right-2 z-10" onClick={(e) => { e.stopPropagation(); toggleAssetSelection(asset.id); }}>
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedAssets.has(asset.id) ? 'bg-ono-green border-ono-green' : 'bg-white/80 border-ono-gray/40'}`}>
@@ -758,6 +760,14 @@ export default function AssetLibraryPage() {
                       <Badge className="bg-black/60 text-white text-[9px] px-1 py-0 border-0">{asset.aspect_ratio}</Badge>
                     </div>
                   )}
+                  {/* Quick download button */}
+                  <button
+                    className="absolute bottom-2 left-2 z-10 w-7 h-7 rounded-full bg-white/90 border border-[#E8E8E8] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-ono-green hover:text-white hover:border-ono-green"
+                    onClick={(e) => { e.stopPropagation(); handleDownloadSingle(asset); }}
+                    title="הורד קובץ"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
                   <div className="aspect-square bg-ono-gray-light flex items-center justify-center relative" onClick={() => setDetailAsset(asset)}>
                     {asset.drive_view_url && asset.file_type === 'image' ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -836,8 +846,28 @@ export default function AssetLibraryPage() {
         )}
       </div>
 
+      {/* Mobile filter toggle */}
+      <button
+        className="lg:hidden fixed bottom-6 right-6 z-40 bg-ono-green text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg hover:bg-ono-green-dark transition-colors"
+        onClick={() => setShowFilterSidebar(!showFilterSidebar)}
+        title="סינון"
+      >
+        <Search className="w-5 h-5" />
+      </button>
+
       {/* Filter sidebar */}
-      <aside className="w-64 shrink-0 space-y-4">
+      {showFilterSidebar && (
+        <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setShowFilterSidebar(false)} />
+      )}
+      <aside className={`w-64 shrink-0 space-y-4 transition-transform duration-200
+        fixed top-0 right-0 h-full z-50 bg-[#FAFAFA] p-4 pt-20
+        lg:static lg:p-0 lg:pt-0 lg:bg-transparent lg:z-auto lg:translate-x-0
+        ${showFilterSidebar ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+      `}>
+        {/* Mobile close button */}
+        <button className="lg:hidden absolute top-4 left-4 p-1 rounded hover:bg-ono-gray-light" onClick={() => setShowFilterSidebar(false)}>
+          <X className="w-5 h-5 text-ono-gray" />
+        </button>
         <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-ono-gray-dark text-sm flex items-center gap-1">סינון <InfoTooltip text="סננו חומרים לפי קריטריונים שונים. ניתן לשלב מספר פילטרים ולשמור חיפושים נפוצים." /></h3>
@@ -1045,13 +1075,8 @@ export default function AssetLibraryPage() {
                     setShareLink('');
                     setDetailAsset(null);
                   }}><Share2 className="w-4 h-4 ml-2" />שתף</Button>
-                  <Button variant="outline" onClick={async () => {
-                    await fetch(`/api/assets/${detailAsset.id}`, { method: 'DELETE' });
-                    // Log activity
-                    fetch('/api/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ action: 'archive', entity_type: 'asset', entity_id: detailAsset.id, entity_name: detailAsset.original_filename })
-                    }).catch(() => {});
-                    setDetailAsset(null); fetchAssets(); showToast('החומר הועבר לארכיון', 'success');
+                  <Button variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50" onClick={() => {
+                    setShowArchiveConfirm(detailAsset);
                   }}><Archive className="w-4 h-4 ml-2" />העבר לארכיון</Button>
                 </div>
               </div>
@@ -1130,6 +1155,35 @@ export default function AssetLibraryPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDownloadConfirm(null)}>ביטול</Button>
             <Button onClick={() => showDownloadConfirm?.action()} className="bg-ono-green hover:bg-ono-green-dark text-white">הורד</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={!!showArchiveConfirm} onOpenChange={() => setShowArchiveConfirm(null)}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-orange-500" /> אישור העברה לארכיון</DialogTitle></DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-ono-gray">
+              האם להעביר את &quot;{showArchiveConfirm?.original_filename}&quot; לארכיון?
+            </p>
+            <p className="text-xs text-ono-gray mt-2">
+              החומר לא יופיע בספרייה אך לא יימחק לצמיתות.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowArchiveConfirm(null)}>ביטול</Button>
+            <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={async () => {
+              if (!showArchiveConfirm) return;
+              await fetch(`/api/assets/${showArchiveConfirm.id}`, { method: 'DELETE' });
+              fetch('/api/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'archive', entity_type: 'asset', entity_id: showArchiveConfirm.id, entity_name: showArchiveConfirm.original_filename })
+              }).catch(() => {});
+              setShowArchiveConfirm(null);
+              setDetailAsset(null);
+              fetchAssets();
+              showToast('החומר הועבר לארכיון', 'success');
+            }}>העבר לארכיון</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

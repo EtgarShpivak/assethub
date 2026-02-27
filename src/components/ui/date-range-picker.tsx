@@ -121,8 +121,8 @@ function MonthCalendar({
             <div
               key={dateStr}
               className={`h-8 flex items-center justify-center text-xs cursor-pointer transition-colors
-                ${isInRange && !isStart && !isEnd ? 'bg-blue-100' : ''}
-                ${isStart || isEnd ? 'bg-blue-600 text-white rounded' : ''}
+                ${isInRange && !isStart && !isEnd ? 'bg-ono-green-light' : ''}
+                ${isStart || isEnd ? 'bg-ono-green text-white rounded' : ''}
                 ${!isInRange && !isStart && !isEnd ? 'hover:bg-ono-gray-light rounded' : ''}
                 ${isToday && !isStart && !isEnd ? 'font-bold text-ono-green' : ''}
               `}
@@ -246,7 +246,7 @@ export function DateRangePicker({ dateFrom, dateTo, onDateChange }: DateRangePic
                 onClick={() => handlePreset(preset)}
                 className={`w-full text-right px-4 py-2 text-sm transition-colors ${
                   activePreset === preset.label
-                    ? 'bg-blue-50 text-blue-600 font-medium'
+                    ? 'bg-ono-green-light text-ono-green-dark font-medium'
                     : 'text-ono-gray-dark hover:bg-ono-gray-light/50'
                 }`}
                 dir="rtl"
@@ -294,7 +294,7 @@ export function DateRangePicker({ dateFrom, dateTo, onDateChange }: DateRangePic
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={handleCancel} className="text-xs">ביטול</Button>
-                <Button size="sm" onClick={handleApply} disabled={!tempFrom || !tempTo} className="bg-blue-600 hover:bg-blue-700 text-white text-xs">עדכן</Button>
+                <Button size="sm" onClick={handleApply} disabled={!tempFrom || !tempTo} className="bg-ono-green hover:bg-ono-green-dark text-white text-xs">עדכן</Button>
               </div>
             </div>
           </div>

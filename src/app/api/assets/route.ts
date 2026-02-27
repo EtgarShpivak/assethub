@@ -155,9 +155,13 @@ export async function GET(request: NextRequest) {
   // Search — includes filename, notes, tags, stored_filename
   const search = searchParams.get('search');
   if (search) {
-    query = query.or(
-      `original_filename.ilike.%${search}%,notes.ilike.%${search}%,stored_filename.ilike.%${search}%`
-    );
+    // Sanitize search input — remove PostgREST special chars to prevent filter injection
+    const sanitized = search.replace(/[().,\\]/g, '').trim().slice(0, 200);
+    if (sanitized) {
+      query = query.or(
+        `original_filename.ilike.%${sanitized}%,notes.ilike.%${sanitized}%,stored_filename.ilike.%${sanitized}%`
+      );
+    }
   }
 
   // Tag search — find assets containing specific tag(s), comma separated

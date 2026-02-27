@@ -1,8 +1,12 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { DashboardClient } from './dashboard-client';
+import { redirect } from 'next/navigation';
 
 export default async function DashboardPage() {
-  const supabase = createServerSupabaseClient();
+  const user = await getAuthUser();
+  if (!user) redirect('/login');
+
+  const supabase = createServiceRoleClient();
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -26,8 +30,8 @@ export default async function DashboardPage() {
     supabase.from('assets').select('*, slugs(display_name, slug)').eq('is_archived', false).order('upload_date', { ascending: false }).limit(20),
     supabase.from('initiatives').select('*, slugs(display_name, slug)').in('status', ['active', 'ongoing']).order('created_at', { ascending: false }).limit(20),
     supabase.from('assets').select('*', { count: 'exact', head: true })
-      .or('platforms.is.null,platforms.eq.{}')
-      .gte('upload_date', weekAgo),
+      .eq('is_archived', false)
+      .or('platforms.is.null,platforms.eq.{}'),
     supabase.from('slugs').select('id, slug, display_name').eq('is_archived', false).order('display_name'),
     supabase.from('assets').select('*', { count: 'exact', head: true }).eq('is_archived', false).gte('upload_date', weekAgo),
     supabase.from('assets').select('*', { count: 'exact', head: true }).eq('is_archived', false).gte('upload_date', monthAgo),
