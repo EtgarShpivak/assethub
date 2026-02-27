@@ -21,6 +21,7 @@ const navItems = [
   { href: '/upload', label: 'העלאת חומרים', icon: Upload },
   { href: '/initiatives', label: 'קמפיינים', icon: Megaphone },
   { href: '/archive', label: 'ארכיון', icon: Archive },
+  { href: '/settings/tags', label: 'ניהול תגיות', icon: Tag },
   { href: '/settings/slugs', label: 'ניהול סלאגים', icon: Tag },
   { href: '/settings', label: 'הגדרות', icon: Settings },
   { href: '/help', label: 'עזרה ותמיכה', icon: HelpCircle },
@@ -35,10 +36,10 @@ export function Sidebar() {
       <div className="px-4 pt-5 pb-4 border-b border-[#E8E8E8]">
         <div className="flex flex-col items-center gap-2">
           <Image
-            src="/ono-logo.svg"
+            src="/ono-logo.png"
             alt="הקריה האקדמית אונו"
-            width={140}
-            height={84}
+            width={160}
+            height={79}
             priority
           />
           <h2 className="text-sm font-bold text-ono-gray-dark text-center leading-tight">

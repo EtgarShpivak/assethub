@@ -4,22 +4,16 @@ import { computeAspectRatio, computeDimensionsLabel, computeFileSizeLabel } from
 import sharp from 'sharp';
 import JSZip from 'jszip';
 
-// Generate a UUID without Node.js crypto module (Vercel compatible)
-function generateUUID(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
-  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1
-  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
-}
-
 export const dynamic = 'force-dynamic';
+export const maxDuration = 120; // Allow up to 2 minutes for large uploads
+export const fetchCache = 'force-no-store';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 const ALLOWED_MIMES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'video/mp4', 'video/quicktime', 'video/webm',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'image/bmp', 'image/tiff', 'image/heic', 'image/heif', 'image/avif',
+  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo',
+  'video/mpeg', 'video/3gpp', 'video/x-matroska', 'video/ogg',
   'application/pdf',
   'application/zip', 'application/x-zip-compressed',
   // Newsletter/brochure formats
@@ -41,8 +35,8 @@ const NEWSLETTER_EXTENSIONS = new Set([
 ]);
 
 const EXTRACTABLE_EXTENSIONS = new Set([
-  'jpg', 'jpeg', 'png', 'gif', 'webp',
-  'mp4', 'mov', 'webm',
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'tif', 'heic', 'heif', 'avif',
+  'mp4', 'mov', 'webm', 'avi', 'mpeg', 'mpg', 'mkv', '3gp', 'ogg',
   'pdf',
   // Newsletter formats in ZIP
   'indd', 'ai', 'eps', 'pub', 'html', 'htm',
@@ -71,8 +65,12 @@ function guessMimeType(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   const mimeMap: Record<string, string> = {
     jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-    gif: 'image/gif', webp: 'image/webp',
+    gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+    bmp: 'image/bmp', tiff: 'image/tiff', tif: 'image/tiff',
+    heic: 'image/heic', heif: 'image/heif', avif: 'image/avif',
     mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+    avi: 'video/x-msvideo', mpeg: 'video/mpeg', mpg: 'video/mpeg',
+    mkv: 'video/x-matroska', '3gp': 'video/3gpp', ogg: 'video/ogg',
     pdf: 'application/pdf',
     indd: 'application/x-indesign', ai: 'application/postscript',
     eps: 'application/postscript', pub: 'application/vnd.ms-publisher',
@@ -232,8 +230,29 @@ export async function POST(request: NextRequest) {
       }
 
       const fileSizeLabel = computeFileSizeLabel(file.size);
-      const ext = file.name.split('.').pop() || 'bin';
-      const storedFilename = `${generateUUID()}.${ext}`;
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+
+      // Smart file naming: slug-campaign-date-type-dimensions-[n].ext
+      const dateStr = uploadDate.split('T')[0].replace(/-/g, '');
+      const dimPart = width && height ? `${width}x${height}` : 'nodim';
+      const baseName = [
+        slug.slug,
+        initiative?.short_code || 'standalone',
+        dateStr,
+        fileType,
+        dimPart,
+      ].join('-');
+
+      // Count existing files with same base to generate running number
+      const { count: existingCount } = await supabase
+        .from('assets')
+        .select('*', { count: 'exact', head: true })
+        .eq('slug_id', slugId)
+        .eq('file_type', fileType)
+        .like('stored_filename', `${baseName}%`);
+
+      const runNumber = String((existingCount || 0) + 1).padStart(2, '0');
+      const storedFilename = `${baseName}-${runNumber}.${ext}`;
       const fullPath = `${storagePath}/${storedFilename}`;
 
       // Upload to Supabase Storage

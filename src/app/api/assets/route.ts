@@ -145,18 +145,26 @@ export async function GET(request: NextRequest) {
     query = query.lte('upload_date', dateTo + 'T23:59:59.999Z');
   }
 
-  // Search — includes filename, notes, and tags
+  // Search — includes filename, notes, tags, stored_filename
   const search = searchParams.get('search');
   if (search) {
     query = query.or(
-      `original_filename.ilike.%${search}%,notes.ilike.%${search}%`
+      `original_filename.ilike.%${search}%,notes.ilike.%${search}%,stored_filename.ilike.%${search}%`
     );
   }
 
-  // Tag search — find assets containing specific tag
+  // Tag search — find assets containing specific tag(s), comma separated
   const tag = searchParams.get('tag');
   if (tag) {
-    query = query.contains('tags', [tag]);
+    const tagList = tag.split(',').filter(Boolean);
+    if (tagList.length === 1) {
+      query = query.contains('tags', [tagList[0]]);
+    } else {
+      // Match any of the tags
+      for (const t of tagList) {
+        query = query.contains('tags', [t]);
+      }
+    }
   }
 
   // Unclassified filter

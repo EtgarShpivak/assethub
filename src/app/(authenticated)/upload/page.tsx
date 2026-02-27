@@ -252,7 +252,7 @@ export default function UploadPage() {
           id="file-input"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.webm,.pdf,.zip,.indd,.ai,.eps,.pub,.html,.htm,.pptx,.ppt,.docx,.doc,.idml"
+          accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.tif,.heic,.heif,.avif,.mp4,.mov,.webm,.avi,.mpeg,.mpg,.mkv,.3gp,.ogg,.pdf,.zip,.indd,.ai,.eps,.pub,.html,.htm,.pptx,.ppt,.docx,.doc,.idml"
           className="hidden"
           onChange={handleFileInput}
         />

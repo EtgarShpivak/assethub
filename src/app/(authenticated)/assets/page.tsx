@@ -20,7 +20,6 @@ import {
   X,
   ArrowUpDown,
   Tag,
-  Calendar,
   Share2,
   Newspaper,
   AlertTriangle,
@@ -40,9 +39,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { DOMAIN_CONTEXTS, PLATFORMS, FILE_TYPES, ASPECT_RATIOS, ASSET_TYPES, DATE_PRESETS, getDatePresetRange } from '@/lib/platform-specs';
+import { DOMAIN_CONTEXTS, PLATFORMS, FILE_TYPES, ASPECT_RATIOS, ASSET_TYPES } from '@/lib/platform-specs';
 import { createClient } from '@/lib/supabase/client';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import type { Asset, Slug, Initiative, SavedSearch } from '@/lib/types';
 
 function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -152,6 +152,7 @@ export default function AssetLibraryPage() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterTag, setFilterTag] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeDatePreset, setActiveDatePreset] = useState('');
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState('upload_date');
@@ -271,21 +272,6 @@ export default function AssetLibraryPage() {
     setFilterDomainContexts([]); setFilterAssetTypes([]);
     setFilterDimensions(''); setFilterDateFrom(''); setFilterDateTo('');
     setFilterTag(''); setActiveDatePreset(''); setPage(1);
-  };
-
-  const applyDatePreset = (preset: string) => {
-    if (activeDatePreset === preset) {
-      // Toggle off
-      setActiveDatePreset('');
-      setFilterDateFrom('');
-      setFilterDateTo('');
-    } else {
-      const range = getDatePresetRange(preset);
-      setActiveDatePreset(preset);
-      setFilterDateFrom(range.from);
-      setFilterDateTo(range.to);
-    }
-    setPage(1);
   };
 
   const getCurrentFilters = () => ({
@@ -702,34 +688,19 @@ export default function AssetLibraryPage() {
             </div>
           </div>
 
-          {/* Date range presets - AT THE TOP */}
+          {/* Date range picker - Facebook style */}
           <div>
-            <Label className="text-xs flex items-center gap-1 mb-2"><Calendar className="w-3 h-3" /> טווח תאריכים <InfoTooltip text="לחצו על פריסט מהיר או בחרו תאריכים ידנית. הפריסט מגדיר את טווח התאריכים אוטומטית." /></Label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {DATE_PRESETS.map(preset => (
-                <button
-                  key={preset.value}
-                  onClick={() => applyDatePreset(preset.value)}
-                  className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                    activeDatePreset === preset.value
-                      ? 'bg-ono-green text-white border-ono-green'
-                      : 'bg-white text-ono-gray-dark border-[#E8E8E8] hover:border-ono-green hover:text-ono-green'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-[10px] text-ono-gray">מתאריך</span>
-                <Input type="date" className="text-xs" value={filterDateFrom} onChange={e => { setFilterDateFrom(e.target.value); setActiveDatePreset(''); setPage(1); }} />
-              </div>
-              <div>
-                <span className="text-[10px] text-ono-gray">עד תאריך</span>
-                <Input type="date" className="text-xs" value={filterDateTo} onChange={e => { setFilterDateTo(e.target.value); setActiveDatePreset(''); setPage(1); }} />
-              </div>
-            </div>
+            <Label className="text-xs flex items-center gap-1 mb-2">טווח תאריכים <InfoTooltip text="לחצו לפתיחת לוח שנה עם פריסטים מהירים. ניתן לבחור טווח תאריכים מותאם אישית." /></Label>
+            <DateRangePicker
+              dateFrom={filterDateFrom}
+              dateTo={filterDateTo}
+              onDateChange={(from, to) => {
+                setFilterDateFrom(from);
+                setFilterDateTo(to);
+                setActiveDatePreset('');
+                setPage(1);
+              }}
+            />
           </div>
 
           <MultiCheckboxFilter label="סלאג" options={slugOptions} selected={filterSlugs} onChange={v => { setFilterSlugs(v); setPage(1); }} />

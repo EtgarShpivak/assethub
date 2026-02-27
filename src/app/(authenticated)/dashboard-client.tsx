@@ -5,12 +5,15 @@ import Link from 'next/link';
 import {
   FolderOpen,
   Megaphone,
-  Download,
   AlertCircle,
   Image as ImageIcon,
   Film,
   FileText,
   Globe,
+  Upload,
+  TrendingUp,
+  Calendar,
+  BarChart3,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
@@ -23,39 +26,12 @@ interface DashboardClientProps {
   recentAssets: Asset[];
   initiatives: (Initiative & { slugs?: { display_name: string; slug: string } })[];
   slugs: { id: string; slug: string; display_name: string }[];
+  uploadsThisWeek: number;
+  uploadsThisMonth: number;
+  imageCount: number;
+  videoCount: number;
+  pdfCount: number;
 }
-
-const statCards = (totalAssets: number, activeInitiatives: number, unclassifiedCount: number) => [
-  {
-    label: 'סה"כ חומרים',
-    value: totalAssets,
-    icon: FolderOpen,
-    color: 'text-ono-green',
-    bgColor: 'bg-ono-green-light',
-  },
-  {
-    label: 'קמפיינים פעילים',
-    value: activeInitiatives,
-    icon: Megaphone,
-    color: 'text-ono-orange',
-    bgColor: 'bg-ono-orange-light',
-  },
-  {
-    label: 'ייצואים השבוע',
-    value: 0,
-    icon: Download,
-    color: 'text-platform-linkedin',
-    bgColor: 'bg-blue-50',
-  },
-  {
-    label: 'ממתינים לסיווג',
-    value: unclassifiedCount,
-    icon: AlertCircle,
-    color: 'text-ono-orange',
-    bgColor: 'bg-ono-orange-light',
-    href: '/assets?unclassified=true',
-  },
-];
 
 function FileTypeIcon({ type }: { type: string }) {
   switch (type) {
@@ -84,8 +60,12 @@ export function DashboardClient({
   recentAssets,
   initiatives,
   slugs,
+  uploadsThisWeek,
+  uploadsThisMonth,
+  imageCount,
+  videoCount,
+  pdfCount,
 }: DashboardClientProps) {
-  const cards = statCards(totalAssets, activeInitiatives, unclassifiedCount);
   const [selectedSlug, setSelectedSlug] = useState<string>('all');
 
   // Filter assets and initiatives by selected slug
@@ -101,6 +81,8 @@ export function DashboardClient({
       ? initiatives.filter(i => !i.slug_id)
       : initiatives.filter(i => i.slug_id === selectedSlug);
 
+  const otherCount = totalAssets - imageCount - videoCount - pdfCount;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -108,34 +90,96 @@ export function DashboardClient({
         <InfoTooltip text="סקירה כללית של המערכת: חומרים, קמפיינים פעילים, העלאות אחרונות וחומרים שממתינים לסיווג." size="md" />
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          const content = (
-            <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-ono-gray mb-1">{card.label}</p>
-                  <p className="text-3xl font-bold text-ono-gray-dark">{card.value}</p>
-                </div>
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${card.bgColor}`}>
-                  <Icon className={`w-6 h-6 ${card.color}`} />
-                </div>
-              </div>
-            </div>
-          );
-
-          if ('href' in card && card.href) {
-            return (
-              <Link key={card.label} href={card.href} className="block hover:opacity-90 transition-opacity">
-                {content}
-              </Link>
-            );
-          }
-          return <div key={card.label}>{content}</div>;
-        })}
+      {/* Quick action buttons */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link
+          href="/upload"
+          className="flex items-center gap-4 p-6 bg-gradient-to-l from-ono-green to-ono-green-dark rounded-xl text-white hover:shadow-lg transition-shadow"
+        >
+          <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
+            <Upload className="w-7 h-7" />
+          </div>
+          <div>
+            <p className="text-lg font-bold">העלאת חומרים</p>
+            <p className="text-sm text-white/80">העלו תמונות, וידאו ומסמכים</p>
+          </div>
+        </Link>
+        <Link
+          href="/assets"
+          className="flex items-center gap-4 p-6 bg-gradient-to-l from-[#4A4A4A] to-ono-gray-dark rounded-xl text-white hover:shadow-lg transition-shadow"
+        >
+          <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
+            <FolderOpen className="w-7 h-7" />
+          </div>
+          <div>
+            <p className="text-lg font-bold">ספריית חומרים</p>
+            <p className="text-sm text-white/80">{totalAssets} חומרים בספרייה</p>
+          </div>
+        </Link>
       </div>
+
+      {/* Stats cards - 2 rows */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+          <FolderOpen className="w-5 h-5 text-ono-green mx-auto mb-1" />
+          <p className="text-2xl font-bold text-ono-gray-dark">{totalAssets}</p>
+          <p className="text-[10px] text-ono-gray">סה&quot;כ חומרים</p>
+        </div>
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+          <Megaphone className="w-5 h-5 text-ono-orange mx-auto mb-1" />
+          <p className="text-2xl font-bold text-ono-gray-dark">{activeInitiatives}</p>
+          <p className="text-[10px] text-ono-gray">קמפיינים פעילים</p>
+        </div>
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+          <TrendingUp className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+          <p className="text-2xl font-bold text-ono-gray-dark">{uploadsThisWeek}</p>
+          <p className="text-[10px] text-ono-gray">העלאות השבוע</p>
+        </div>
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+          <Calendar className="w-5 h-5 text-purple-500 mx-auto mb-1" />
+          <p className="text-2xl font-bold text-ono-gray-dark">{uploadsThisMonth}</p>
+          <p className="text-[10px] text-ono-gray">העלאות החודש</p>
+        </div>
+        <Link href="/assets?unclassified=true" className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-ono-orange transition-colors">
+          <AlertCircle className="w-5 h-5 text-ono-orange mx-auto mb-1" />
+          <p className="text-2xl font-bold text-ono-gray-dark">{unclassifiedCount}</p>
+          <p className="text-[10px] text-ono-gray">ממתינים לסיווג</p>
+        </Link>
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+          <BarChart3 className="w-5 h-5 text-ono-green mx-auto mb-1" />
+          <p className="text-2xl font-bold text-ono-gray-dark">{slugs.length}</p>
+          <p className="text-[10px] text-ono-gray">סלאגים פעילים</p>
+        </div>
+      </div>
+
+      {/* Content type breakdown */}
+      {totalAssets > 0 && (
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5">
+          <h2 className="text-sm font-bold text-ono-gray-dark mb-3">חלוקת חומרים לפי סוג</h2>
+          <div className="flex gap-3 items-center">
+            <div className="flex-1 h-4 bg-ono-gray-light rounded-full overflow-hidden flex">
+              {imageCount > 0 && (
+                <div className="bg-ono-green h-full transition-all" style={{ width: `${(imageCount / totalAssets) * 100}%` }} title={`תמונות: ${imageCount}`} />
+              )}
+              {videoCount > 0 && (
+                <div className="bg-platform-meta h-full transition-all" style={{ width: `${(videoCount / totalAssets) * 100}%` }} title={`וידאו: ${videoCount}`} />
+              )}
+              {pdfCount > 0 && (
+                <div className="bg-platform-google h-full transition-all" style={{ width: `${(pdfCount / totalAssets) * 100}%` }} title={`PDF: ${pdfCount}`} />
+              )}
+              {otherCount > 0 && (
+                <div className="bg-ono-gray h-full transition-all" style={{ width: `${(otherCount / totalAssets) * 100}%` }} title={`אחר: ${otherCount}`} />
+              )}
+            </div>
+          </div>
+          <div className="flex gap-4 mt-2 text-xs">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-ono-green" /> תמונות ({imageCount})</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-platform-meta" /> וידאו ({videoCount})</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-platform-google" /> PDF ({pdfCount})</span>
+            {otherCount > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-ono-gray" /> אחר ({otherCount})</span>}
+          </div>
+        </div>
+      )}
 
       {/* Faculty tabs */}
       {slugs.length > 1 && (

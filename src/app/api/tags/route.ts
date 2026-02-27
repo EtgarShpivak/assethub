@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export async function GET() {
 
   const supabase = createServiceRoleClient();
 
-  // Aggregate all unique tags from assets
+  // Aggregate all unique tags from assets with usage count
   const { data, error } = await supabase
     .from('assets')
     .select('tags')
@@ -21,19 +21,100 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Flatten and deduplicate tags
-  const tagSet = new Set<string>();
+  // Count tag usage
+  const tagCounts = new Map<string, number>();
   for (const row of data || []) {
     if (Array.isArray(row.tags)) {
       for (const tag of row.tags) {
         if (tag && typeof tag === 'string') {
-          tagSet.add(tag.trim());
+          const t = tag.trim();
+          tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
         }
       }
     }
   }
 
-  const tags = Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'he'));
+  const tags = Array.from(tagCounts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'he'));
 
   return NextResponse.json(tags);
+}
+
+// Rename a tag across all assets
+export async function PUT(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createServiceRoleClient();
+  const { oldName, newName } = await request.json();
+
+  if (!oldName || !newName) {
+    return NextResponse.json({ error: 'Missing oldName or newName' }, { status: 400 });
+  }
+
+  // Find all assets containing the old tag
+  const { data: assets, error } = await supabase
+    .from('assets')
+    .select('id, tags')
+    .contains('tags', [oldName]);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Update each asset, replacing the old tag with the new one
+  let updated = 0;
+  for (const asset of assets || []) {
+    const newTags = (asset.tags as string[]).map(t => t === oldName ? newName : t);
+    // Remove duplicates
+    const uniqueTags = Array.from(new Set(newTags));
+    const { error: updateError } = await supabase
+      .from('assets')
+      .update({ tags: uniqueTags })
+      .eq('id', asset.id);
+    if (!updateError) updated++;
+  }
+
+  return NextResponse.json({ updated });
+}
+
+// Delete a tag from all assets
+export async function DELETE(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createServiceRoleClient();
+  const { name } = await request.json();
+
+  if (!name) {
+    return NextResponse.json({ error: 'Missing tag name' }, { status: 400 });
+  }
+
+  // Find all assets containing this tag
+  const { data: assets, error } = await supabase
+    .from('assets')
+    .select('id, tags')
+    .contains('tags', [name]);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Remove tag from each asset
+  let updated = 0;
+  for (const asset of assets || []) {
+    const newTags = (asset.tags as string[]).filter(t => t !== name);
+    const { error: updateError } = await supabase
+      .from('assets')
+      .update({ tags: newTags.length > 0 ? newTags : null })
+      .eq('id', asset.id);
+    if (!updateError) updated++;
+  }
+
+  return NextResponse.json({ updated });
 }
