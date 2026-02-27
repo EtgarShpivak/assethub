@@ -134,7 +134,7 @@ export default function AssetLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [slugs, setSlugs] = useState<Slug[]>([]);
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
@@ -543,7 +543,7 @@ export default function AssetLibraryPage() {
             >
               <option value="">כל התגיות</option>
               {availableTags.map(t => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t.name} value={t.name}>{t.name} ({t.count})</option>
               ))}
             </select>
           </div>
