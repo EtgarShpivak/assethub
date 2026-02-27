@@ -26,6 +26,11 @@ import {
   Link as LinkIcon,
   Copy,
   CheckCircle,
+  Pencil,
+  MessageSquare,
+  Send,
+  Clock,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +48,7 @@ import { DOMAIN_CONTEXTS, PLATFORMS, FILE_TYPES, ASPECT_RATIOS, ASSET_TYPES } fr
 import { createClient } from '@/lib/supabase/client';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import type { Asset, Slug, Initiative, SavedSearch } from '@/lib/types';
+import type { Asset, Slug, Initiative, SavedSearch, AssetComment } from '@/lib/types';
 
 function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' | 'lg' }) {
   const cls = size === 'lg' ? 'w-16 h-16' : size === 'md' ? 'w-8 h-8' : 'w-5 h-5';
@@ -176,6 +181,28 @@ export default function AssetLibraryPage() {
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
   const initialLoad = useRef(true);
 
+  // Edit mode for detail modal
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState<Partial<Asset>>({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Bulk edit
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkEditData, setBulkEditData] = useState<{
+    tags_action?: 'add' | 'set';
+    tags?: string;
+    platforms?: string[];
+    domain_context?: string;
+    initiative_id?: string;
+    asset_type?: string;
+  }>({});
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  // Comments
+  const [comments, setComments] = useState<AssetComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
   const showToast = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToast({ message, type });
   }, []);
@@ -252,6 +279,16 @@ export default function AssetLibraryPage() {
     const timer = setTimeout(() => { setPage(1); }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, filterTag]);
+
+  // Load comments when detail modal opens
+  useEffect(() => {
+    if (detailAsset) {
+      loadComments(detailAsset.id);
+      setEditMode(false);
+      setNewComment('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailAsset]);
 
   const toggleAssetSelection = (id: string) => {
     setSelectedAssets(prev => {
@@ -483,6 +520,116 @@ export default function AssetLibraryPage() {
     setTimeout(() => setCopiedShare(false), 2000);
   };
 
+  // ===== Inline Edit =====
+  const startEdit = (asset: Asset) => {
+    setEditMode(true);
+    setEditData({
+      tags: asset.tags || [],
+      platforms: asset.platforms || [],
+      domain_context: asset.domain_context || undefined,
+      initiative_id: asset.initiative_id || undefined,
+      asset_type: asset.asset_type,
+      notes: asset.notes || '',
+      slug_id: asset.slug_id,
+      expires_at: asset.expires_at || undefined,
+      license_notes: asset.license_notes || '',
+    });
+    // Load comments
+    loadComments(asset.id);
+  };
+
+  const saveEdit = async () => {
+    if (!detailAsset) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/assets/${detailAsset.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editData),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setDetailAsset({ ...detailAsset, ...updated });
+        setEditMode(false);
+        fetchAssets();
+        showToast('החומר עודכן בהצלחה', 'success');
+        // Log activity
+        fetch('/api/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'edit', entity_type: 'asset', entity_id: detailAsset.id, entity_name: detailAsset.original_filename })
+        }).catch(() => {});
+      } else {
+        showToast('שגיאה בעדכון', 'error');
+      }
+    } catch { showToast('שגיאה בעדכון', 'error'); }
+    setEditSaving(false);
+  };
+
+  // ===== Bulk Edit =====
+  const handleBulkEdit = async () => {
+    if (selectedAssets.size === 0) return;
+    setBulkSaving(true);
+    const ids = Array.from(selectedAssets);
+    let successCount = 0;
+    for (const id of ids) {
+      const patchData: Record<string, unknown> = {};
+      if (bulkEditData.domain_context) patchData.domain_context = bulkEditData.domain_context;
+      if (bulkEditData.initiative_id) patchData.initiative_id = bulkEditData.initiative_id;
+      if (bulkEditData.asset_type) patchData.asset_type = bulkEditData.asset_type;
+      if (bulkEditData.platforms && bulkEditData.platforms.length > 0) patchData.platforms = bulkEditData.platforms;
+      if (bulkEditData.tags) {
+        const newTags = bulkEditData.tags.split(',').map(t => t.trim()).filter(Boolean);
+        if (bulkEditData.tags_action === 'add') {
+          const asset = assets.find(a => a.id === id);
+          const existing = asset?.tags || [];
+          patchData.tags = Array.from(new Set([...existing, ...newTags]));
+        } else {
+          patchData.tags = newTags;
+        }
+      }
+      if (Object.keys(patchData).length > 0) {
+        const res = await fetch(`/api/assets/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchData),
+        });
+        if (res.ok) successCount++;
+      }
+    }
+    setBulkSaving(false);
+    setShowBulkEdit(false);
+    setBulkEditData({});
+    setSelectedAssets(new Set());
+    fetchAssets();
+    showToast(`${successCount} חומרים עודכנו בהצלחה`, 'success');
+  };
+
+  // ===== Comments =====
+  const loadComments = async (assetId: string) => {
+    setCommentsLoading(true);
+    try {
+      const res = await fetch(`/api/comments?asset_id=${assetId}`);
+      const data = await res.json();
+      setComments(Array.isArray(data) ? data : []);
+    } catch { setComments([]); }
+    setCommentsLoading(false);
+  };
+
+  const addComment = async () => {
+    if (!detailAsset || !newComment.trim()) return;
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_id: detailAsset.id, content: newComment.trim() }),
+      });
+      if (res.ok) {
+        const comment = await res.json();
+        setComments(prev => [...prev, comment]);
+        setNewComment('');
+      }
+    } catch { showToast('שגיאה בהוספת הערה', 'error'); }
+  };
+
   const toggleSort = (field: string) => {
     if (sortBy === field) setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
     else { setSortBy(field); setSortDir('desc'); }
@@ -542,6 +689,7 @@ export default function AssetLibraryPage() {
               className="w-full border border-[#E8E8E8] rounded-md p-2 pr-10 text-sm h-10 appearance-none"
             >
               <option value="">כל התגיות</option>
+              <option value="__no_tags__">ללא תגיות</option>
               {availableTags.map(t => (
                 <option key={t.name} value={t.name}>{t.name} ({t.count})</option>
               ))}
@@ -570,6 +718,10 @@ export default function AssetLibraryPage() {
               <Button size="sm" variant="outline" onClick={() => { setShowShareDialog(true); setShareLink(''); }}>
                 <Share2 className="w-4 h-4 ml-1" />
                 שתף
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowBulkEdit(true)}>
+                <Pencil className="w-4 h-4 ml-1" />
+                ערוך נבחרים
               </Button>
               <Button size="sm" className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={handleDownloadSelected} disabled={downloading}>
                 {downloading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin ml-1" /> : <Download className="w-4 h-4 ml-1" />}
@@ -606,10 +758,17 @@ export default function AssetLibraryPage() {
                       <Badge className="bg-black/60 text-white text-[9px] px-1 py-0 border-0">{asset.aspect_ratio}</Badge>
                     </div>
                   )}
-                  <div className="aspect-square bg-ono-gray-light flex items-center justify-center" onClick={() => setDetailAsset(asset)}>
+                  <div className="aspect-square bg-ono-gray-light flex items-center justify-center relative" onClick={() => setDetailAsset(asset)}>
                     {asset.drive_view_url && asset.file_type === 'image' ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={asset.drive_view_url} alt={asset.original_filename} className="w-full h-full object-cover" loading="lazy" />
+                    ) : asset.drive_view_url && asset.file_type === 'video' ? (
+                      <>
+                        <video src={asset.drive_view_url} className="w-full h-full object-cover" muted preload="metadata" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <Film className="w-10 h-10 text-white drop-shadow-lg" />
+                        </div>
+                      </>
                     ) : (
                       <FileTypeIcon type={asset.file_type} size="lg" />
                     )}
@@ -704,7 +863,7 @@ export default function AssetLibraryPage() {
           </div>
 
           <MultiCheckboxFilter label="סלאג" options={slugOptions} selected={filterSlugs} onChange={v => { setFilterSlugs(v); setPage(1); }} />
-          <MultiCheckboxFilter label="קמפיין" options={initiativeOptions} selected={filterInitiatives} onChange={v => { setFilterInitiatives(v); setPage(1); }} />
+          <MultiCheckboxFilter label="קמפיין" options={[{ value: '__no_initiative__', label: 'ללא קמפיין' }, ...initiativeOptions]} selected={filterInitiatives} onChange={v => { setFilterInitiatives(v); setPage(1); }} />
           <MultiCheckboxFilter label="סוג קובץ" options={FILE_TYPES} selected={filterFileTypes} onChange={v => { setFilterFileTypes(v); setPage(1); }} />
           <MultiCheckboxFilter label="סוג חומר" options={ASSET_TYPES} selected={filterAssetTypes} onChange={v => { setFilterAssetTypes(v); setPage(1); }} />
           <MultiCheckboxFilter label="פלטפורמה" options={[...PLATFORMS, { value: 'none', label: 'ללא שיוך', color: '#888' } as { value: string; label: string; color: string }]} selected={filterPlatforms} onChange={v => { setFilterPlatforms(v); setPage(1); }} />
@@ -720,34 +879,165 @@ export default function AssetLibraryPage() {
       </aside>
 
       {/* Detail Modal */}
-      <Dialog open={!!detailAsset} onOpenChange={() => setDetailAsset(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto" dir="rtl">
+      <Dialog open={!!detailAsset} onOpenChange={() => { setDetailAsset(null); setEditMode(false); setComments([]); setNewComment(''); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto" dir="rtl">
           {detailAsset && (
             <>
-              <DialogHeader><DialogTitle className="text-lg">{detailAsset.original_filename}</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-lg">{detailAsset.original_filename}</DialogTitle>
+                  <Button variant="ghost" size="sm" onClick={() => editMode ? setEditMode(false) : startEdit(detailAsset)}>
+                    <Pencil className="w-4 h-4 ml-1" />
+                    {editMode ? 'בטל עריכה' : 'ערוך'}
+                  </Button>
+                </div>
+              </DialogHeader>
               <div className="space-y-4">
+                {/* Preview: Image / Video / Icon */}
                 <div className="bg-ono-gray-light rounded-lg flex items-center justify-center p-4 min-h-[200px]">
                   {detailAsset.drive_view_url && detailAsset.file_type === 'image' ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={detailAsset.drive_view_url} alt={detailAsset.original_filename} className="max-h-[400px] rounded" />
+                  ) : detailAsset.drive_view_url && detailAsset.file_type === 'video' ? (
+                    <video src={detailAsset.drive_view_url} controls className="max-h-[400px] rounded w-full" preload="metadata" />
                   ) : <FileTypeIcon type={detailAsset.file_type} size="lg" />}
                 </div>
+
+                {/* Badges row */}
                 <div className="flex flex-wrap gap-2">
                   {detailAsset.dimensions_label && <Badge className="bg-ono-green-light text-ono-green-dark border-ono-green/30">{detailAsset.dimensions_label}</Badge>}
                   {detailAsset.aspect_ratio && <Badge className="bg-ono-green-light text-ono-green-dark border-ono-green/30">{detailAsset.aspect_ratio}</Badge>}
                   {detailAsset.file_size_label && <Badge variant="outline">{detailAsset.file_size_label}</Badge>}
                   {detailAsset.asset_type && <Badge variant="outline">{ASSET_TYPES.find(t => t.value === detailAsset.asset_type)?.label}</Badge>}
                   {detailAsset.platforms?.map(p => <PlatformBadge key={p} platform={p} />)}
+                  {detailAsset.version && detailAsset.version > 1 && <Badge variant="outline"><Layers className="w-3 h-3 ml-1" />גרסה {detailAsset.version}</Badge>}
+                  {detailAsset.expires_at && <Badge variant="outline" className={new Date(detailAsset.expires_at) < new Date() ? 'border-red-300 text-red-600' : 'border-orange-300 text-orange-600'}><Clock className="w-3 h-3 ml-1" />{new Date(detailAsset.expires_at) < new Date() ? 'פג תוקף' : `תוקף עד ${new Date(detailAsset.expires_at).toLocaleDateString('he-IL')}`}</Badge>}
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-ono-gray">סלאג:</span><span className="mr-2 text-ono-gray-dark">{(detailAsset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || '—'}</span></div>
-                  <div><span className="text-ono-gray">קמפיין:</span><span className="mr-2 text-ono-gray-dark">{(detailAsset as Asset & { initiatives?: { name: string } }).initiatives?.name || '—'}</span></div>
-                  <div><span className="text-ono-gray">סוג קובץ:</span><span className="mr-2 text-ono-gray-dark">{FILE_TYPES.find(f => f.value === detailAsset.file_type)?.label}</span></div>
-                  <div><span className="text-ono-gray">סוג תוכן:</span><span className="mr-2 text-ono-gray-dark">{DOMAIN_CONTEXTS.find(d => d.value === detailAsset.domain_context)?.label || '—'}</span></div>
-                  <div><span className="text-ono-gray">תאריך:</span><span className="mr-2 text-ono-gray-dark">{new Date(detailAsset.upload_date).toLocaleDateString('he-IL')}</span></div>
-                  <div><span className="text-ono-gray">תגיות:</span><span className="mr-2 text-ono-gray-dark">{detailAsset.tags?.join(', ') || '—'}</span></div>
+
+                {/* Edit mode or read-only display */}
+                {editMode ? (
+                  <div className="space-y-3 bg-ono-gray-light/50 rounded-lg p-4 border border-[#E8E8E8]">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">סלאג</Label>
+                        <select value={editData.slug_id || ''} onChange={e => setEditData({ ...editData, slug_id: e.target.value })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                          {slugs.filter(s => !s.is_archived).map(s => <option key={s.id} value={s.id}>{s.display_name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">קמפיין</Label>
+                        <select value={editData.initiative_id || ''} onChange={e => setEditData({ ...editData, initiative_id: e.target.value || undefined })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                          <option value="">ללא קמפיין</option>
+                          {initiatives.map(i => <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">סוג תוכן</Label>
+                        <select value={editData.domain_context || ''} onChange={e => setEditData({ ...editData, domain_context: (e.target.value || null) as Asset['domain_context'] })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                          <option value="">לא מוגדר</option>
+                          {DOMAIN_CONTEXTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">סוג חומר</Label>
+                        <select value={editData.asset_type || 'production'} onChange={e => setEditData({ ...editData, asset_type: e.target.value as Asset['asset_type'] })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                          {ASSET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">תגיות (מופרדות בפסיק)</Label>
+                      <Input className="mt-1 text-sm" value={Array.isArray(editData.tags) ? editData.tags.join(', ') : ''} onChange={e => setEditData({ ...editData, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })} placeholder="תגית1, תגית2, ..." />
+                    </div>
+                    <div>
+                      <Label className="text-xs">פלטפורמות</Label>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {PLATFORMS.map(p => (
+                          <label key={p.value} className="flex items-center gap-1 text-xs cursor-pointer">
+                            <Checkbox checked={Array.isArray(editData.platforms) && editData.platforms.includes(p.value)} onCheckedChange={c => {
+                              const cur = Array.isArray(editData.platforms) ? editData.platforms : [];
+                              setEditData({ ...editData, platforms: c ? [...cur, p.value] : cur.filter(v => v !== p.value) });
+                            }} className="h-3.5 w-3.5" />
+                            <span>{p.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">הערות</Label>
+                      <textarea className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1 min-h-[60px]" value={editData.notes || ''} onChange={e => setEditData({ ...editData, notes: e.target.value })} placeholder="הערות על החומר..." />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">תאריך תפוגה</Label>
+                        <Input type="date" className="mt-1 text-sm" dir="ltr" value={editData.expires_at ? editData.expires_at.split('T')[0] : ''} onChange={e => setEditData({ ...editData, expires_at: e.target.value ? new Date(e.target.value).toISOString() : undefined })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">הערות רישיון</Label>
+                        <Input className="mt-1 text-sm" value={editData.license_notes || ''} onChange={e => setEditData({ ...editData, license_notes: e.target.value })} placeholder="פרטי רישיון..." />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={saveEdit} disabled={editSaving}>
+                        {editSaving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin ml-2" /> : <Check className="w-4 h-4 ml-2" />}
+                        שמור שינויים
+                      </Button>
+                      <Button variant="outline" onClick={() => setEditMode(false)}>ביטול</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><span className="text-ono-gray">סלאג:</span><span className="mr-2 text-ono-gray-dark">{(detailAsset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || '—'}</span></div>
+                      <div><span className="text-ono-gray">קמפיין:</span><span className="mr-2 text-ono-gray-dark">{(detailAsset as Asset & { initiatives?: { name: string } }).initiatives?.name || '—'}</span></div>
+                      <div><span className="text-ono-gray">סוג קובץ:</span><span className="mr-2 text-ono-gray-dark">{FILE_TYPES.find(f => f.value === detailAsset.file_type)?.label}</span></div>
+                      <div><span className="text-ono-gray">סוג תוכן:</span><span className="mr-2 text-ono-gray-dark">{DOMAIN_CONTEXTS.find(d => d.value === detailAsset.domain_context)?.label || '—'}</span></div>
+                      <div><span className="text-ono-gray">תאריך:</span><span className="mr-2 text-ono-gray-dark">{new Date(detailAsset.upload_date).toLocaleDateString('he-IL')}</span></div>
+                      <div><span className="text-ono-gray">תגיות:</span><span className="mr-2 text-ono-gray-dark">{detailAsset.tags?.join(', ') || '—'}</span></div>
+                      {detailAsset.license_notes && <div className="col-span-2"><span className="text-ono-gray">רישיון:</span><span className="mr-2 text-ono-gray-dark">{detailAsset.license_notes}</span></div>}
+                    </div>
+                    {/* Notes */}
+                    {detailAsset.notes && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <span className="text-xs font-bold text-yellow-700 block mb-1">הערות</span>
+                        <p className="text-sm text-yellow-800">{detailAsset.notes}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Comments section */}
+                <div className="border-t border-[#E8E8E8] pt-4">
+                  <h4 className="text-sm font-bold text-ono-gray-dark mb-3 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    הערות ({comments.length})
+                  </h4>
+                  {commentsLoading ? (
+                    <p className="text-xs text-ono-gray">טוען הערות...</p>
+                  ) : (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto mb-3">
+                      {comments.length === 0 && <p className="text-xs text-ono-gray">אין הערות עדיין</p>}
+                      {comments.map(c => (
+                        <div key={c.id} className="bg-ono-gray-light rounded-lg p-2.5 text-sm">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-ono-gray-dark text-xs">{c.user_name || 'משתמש'}</span>
+                            <span className="text-[10px] text-ono-gray">{new Date(c.created_at).toLocaleDateString('he-IL')} {new Date(c.created_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <p className="text-ono-gray-dark">{c.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input className="flex-1 text-sm" placeholder="הוסף הערה..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(); } }} />
+                    <Button size="sm" className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={addComment} disabled={!newComment.trim()}>
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2 pt-2">
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2 border-t border-[#E8E8E8]">
                   <Button className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={() => handleDownloadSingle(detailAsset)}><Download className="w-4 h-4 ml-2" />הורד</Button>
                   <Button variant="outline" onClick={() => {
                     setSelectedAssets(new Set([detailAsset.id]));
@@ -755,7 +1045,14 @@ export default function AssetLibraryPage() {
                     setShareLink('');
                     setDetailAsset(null);
                   }}><Share2 className="w-4 h-4 ml-2" />שתף</Button>
-                  <Button variant="outline" onClick={async () => { await fetch(`/api/assets/${detailAsset.id}`, { method: 'DELETE' }); setDetailAsset(null); fetchAssets(); showToast('החומר הועבר לארכיון', 'success'); }}><Archive className="w-4 h-4 ml-2" />העבר לארכיון</Button>
+                  <Button variant="outline" onClick={async () => {
+                    await fetch(`/api/assets/${detailAsset.id}`, { method: 'DELETE' });
+                    // Log activity
+                    fetch('/api/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'archive', entity_type: 'asset', entity_id: detailAsset.id, entity_name: detailAsset.original_filename })
+                    }).catch(() => {});
+                    setDetailAsset(null); fetchAssets(); showToast('החומר הועבר לארכיון', 'success');
+                  }}><Archive className="w-4 h-4 ml-2" />העבר לארכיון</Button>
                 </div>
               </div>
             </>
@@ -833,6 +1130,69 @@ export default function AssetLibraryPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDownloadConfirm(null)}>ביטול</Button>
             <Button onClick={() => showDownloadConfirm?.action()} className="bg-ono-green hover:bg-ono-green-dark text-white">הורד</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Edit Dialog */}
+      <Dialog open={showBulkEdit} onOpenChange={setShowBulkEdit}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Pencil className="w-5 h-5 text-ono-green" /> עריכה מרוכזת ({selectedAssets.size} חומרים)</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-ono-gray">השאר שדות ריקים כדי לא לשנות אותם. רק שדות שמולאו יעודכנו.</p>
+            <div>
+              <Label className="text-xs">סוג תוכן</Label>
+              <select value={bulkEditData.domain_context || ''} onChange={e => setBulkEditData({ ...bulkEditData, domain_context: e.target.value || undefined })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">ללא שינוי</option>
+                {DOMAIN_CONTEXTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">קמפיין</Label>
+              <select value={bulkEditData.initiative_id || ''} onChange={e => setBulkEditData({ ...bulkEditData, initiative_id: e.target.value || undefined })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">ללא שינוי</option>
+                {initiatives.map(i => <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">סוג חומר</Label>
+              <select value={bulkEditData.asset_type || ''} onChange={e => setBulkEditData({ ...bulkEditData, asset_type: e.target.value || undefined })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">ללא שינוי</option>
+                {ASSET_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">פלטפורמות</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {PLATFORMS.map(p => (
+                  <label key={p.value} className="flex items-center gap-1 text-xs cursor-pointer">
+                    <Checkbox checked={bulkEditData.platforms?.includes(p.value) || false} onCheckedChange={c => {
+                      const cur = bulkEditData.platforms || [];
+                      setBulkEditData({ ...bulkEditData, platforms: c ? [...cur, p.value] : cur.filter(v => v !== p.value) });
+                    }} className="h-3.5 w-3.5" />
+                    <span>{p.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-xs">תגיות</Label>
+                <div className="flex gap-1">
+                  <Button variant={bulkEditData.tags_action === 'add' || !bulkEditData.tags_action ? 'default' : 'outline'} size="sm" className={`text-[10px] h-5 px-2 ${bulkEditData.tags_action !== 'set' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''}`} onClick={() => setBulkEditData({ ...bulkEditData, tags_action: 'add' })}>הוסף</Button>
+                  <Button variant={bulkEditData.tags_action === 'set' ? 'default' : 'outline'} size="sm" className={`text-[10px] h-5 px-2 ${bulkEditData.tags_action === 'set' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''}`} onClick={() => setBulkEditData({ ...bulkEditData, tags_action: 'set' })}>החלף</Button>
+                </div>
+              </div>
+              <Input className="text-sm" value={bulkEditData.tags || ''} onChange={e => setBulkEditData({ ...bulkEditData, tags: e.target.value })} placeholder="תגית1, תגית2, ..." />
+              <p className="text-[10px] text-ono-gray mt-1">{bulkEditData.tags_action === 'set' ? 'כל התגיות הקיימות יוחלפו' : 'התגיות יתווספו לתגיות הקיימות'}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowBulkEdit(false); setBulkEditData({}); }}>ביטול</Button>
+            <Button onClick={handleBulkEdit} disabled={bulkSaving} className="bg-ono-green hover:bg-ono-green-dark text-white">
+              {bulkSaving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin ml-2" /> : <Check className="w-4 h-4 ml-2" />}
+              עדכן {selectedAssets.size} חומרים
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

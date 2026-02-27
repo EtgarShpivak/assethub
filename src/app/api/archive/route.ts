@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   if (action === 'restore') {
     const { error } = await supabase
       .from('assets')
-      .update({ is_archived: false })
+      .update({ is_archived: false, archived_at: null })
       .in('id', asset_ids);
 
     if (error) {

@@ -12,6 +12,8 @@ import {
   Megaphone,
   HelpCircle,
   Archive,
+  Bookmark,
+  ScrollText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +25,8 @@ const navItems = [
   { href: '/archive', label: 'ארכיון', icon: Archive },
   { href: '/settings/tags', label: 'ניהול תגיות', icon: Tag },
   { href: '/settings/slugs', label: 'ניהול סלאגים', icon: Tag },
+  { href: '/collections', label: 'אוספים', icon: Bookmark },
+  { href: '/activity', label: 'יומן פעילות', icon: ScrollText },
   { href: '/settings', label: 'הגדרות', icon: Settings },
   { href: '/help', label: 'עזרה ותמיכה', icon: HelpCircle },
 ];

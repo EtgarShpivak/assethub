@@ -85,9 +85,10 @@ export default function ArchivePage() {
     setProcessing(false);
   };
 
-  // Calculate days since archived (using upload_date as proxy)
-  const getDaysInArchive = (uploadDate: string) => {
-    const diff = Date.now() - new Date(uploadDate).getTime();
+  // Calculate days since archived (prefer archived_at, fall back to upload_date)
+  const getDaysInArchive = (asset: Asset) => {
+    const archiveDate = (asset as Asset & { archived_at?: string }).archived_at || asset.upload_date;
+    const diff = Date.now() - new Date(archiveDate).getTime();
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   };
 
@@ -167,7 +168,7 @@ export default function ArchivePage() {
             </thead>
             <tbody>
               {assets.map((asset, i) => {
-                const days = getDaysInArchive(asset.upload_date);
+                const days = getDaysInArchive(asset);
                 const expiring = days >= 25;
                 return (
                   <tr key={asset.id} className={`border-b border-[#E8E8E8] hover:bg-ono-gray-light/50 ${i % 2 === 1 ? 'bg-ono-gray-light/30' : ''} ${expiring ? 'bg-red-50/50' : ''}`}>

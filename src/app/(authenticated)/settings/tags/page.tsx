@@ -59,6 +59,8 @@ export default function TagManagementPage() {
     !searchQuery || t.name.includes(searchQuery)
   );
 
+  const [addTagInfo, setAddTagInfo] = useState<string | null>(null);
+
   const handleAddTag = async () => {
     if (!newTagName.trim()) return;
     // Check if tag already exists
@@ -66,10 +68,12 @@ export default function TagManagementPage() {
       return;
     }
     setAdding(true);
-    // To add a new managed tag, we create a dummy asset update
-    // Instead, we'll just show it in the list - it will be available in uploads
-    // For now, just add it locally
+    // Tags are stored as values in assets[].tags arrays, so a new tag only
+    // becomes persistent once it is assigned to at least one asset.
+    // We add it to the local list so it is visible for the current session and
+    // show an informational message to the user.
     setTags(prev => [...prev, { name: newTagName.trim(), count: 0 }].sort((a, b) => a.name.localeCompare(b.name, 'he')));
+    setAddTagInfo(newTagName.trim());
     setNewTagName('');
     setAdding(false);
   };
@@ -148,6 +152,18 @@ export default function TagManagementPage() {
           </Button>
         </div>
       </div>
+
+      {/* Info message after adding a new tag */}
+      {addTagInfo && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between text-sm text-blue-800">
+          <span>
+            התגית <strong>{addTagInfo}</strong> נוספה. התגית תופיע ברשימה באופן קבוע לאחר שתשויך לחומר ראשון.
+          </span>
+          <button onClick={() => setAddTagInfo(null)} className="text-blue-500 hover:text-blue-700 mr-2">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Tags count */}
       <div className="text-sm text-ono-gray">

@@ -49,14 +49,21 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Initiative filter — supports multiple IDs
+  // Initiative filter — supports multiple IDs + special __no_initiative__
   const initiativeId = searchParams.get('initiative_id');
   if (initiativeId) {
     const ids = initiativeId.split(',').filter(Boolean);
-    if (ids.length === 1) {
-      query = query.eq('initiative_id', ids[0]);
+    const noInit = ids.includes('__no_initiative__');
+    const realIds = ids.filter(id => id !== '__no_initiative__');
+
+    if (noInit && realIds.length > 0) {
+      query = query.or(`initiative_id.is.null,initiative_id.in.(${realIds.join(',')})`);
+    } else if (noInit) {
+      query = query.is('initiative_id', null);
+    } else if (realIds.length === 1) {
+      query = query.eq('initiative_id', realIds[0]);
     } else {
-      query = query.in('initiative_id', ids);
+      query = query.in('initiative_id', realIds);
     }
   }
 
@@ -156,13 +163,15 @@ export async function GET(request: NextRequest) {
   // Tag search — find assets containing specific tag(s), comma separated
   const tag = searchParams.get('tag');
   if (tag) {
-    const tagList = tag.split(',').filter(Boolean);
-    if (tagList.length === 1) {
-      query = query.contains('tags', [tagList[0]]);
+    if (tag === '__no_tags__') {
+      query = query.or('tags.is.null,tags.eq.{}');
     } else {
-      // Match any of the tags
-      for (const t of tagList) {
-        query = query.contains('tags', [t]);
+      const tagList = tag.split(',').filter(Boolean);
+      if (tagList.length === 1) {
+        query = query.contains('tags', [tagList[0]]);
+      } else {
+        // Match ANY of the tags (OR logic)
+        query = query.or(tagList.map(t => `tags.cs.{${t}}`).join(','));
       }
     }
   }

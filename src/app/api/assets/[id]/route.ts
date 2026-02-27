@@ -39,9 +39,24 @@ export async function PATCH(
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
+  // Whitelist allowed fields
+  const ALLOWED_FIELDS = new Set([
+    'tags', 'platforms', 'domain_context', 'initiative_id', 'asset_type',
+    'notes', 'slug_id', 'expires_at', 'license_notes', 'is_archived',
+  ]);
+  const sanitized: Record<string, unknown> = {};
+  for (const key of Object.keys(body)) {
+    if (ALLOWED_FIELDS.has(key)) {
+      sanitized[key] = body[key];
+    }
+  }
+  if (Object.keys(sanitized).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from('assets')
-    .update(body)
+    .update(sanitized)
     .eq('id', params.id)
     .select()
     .single();
@@ -66,7 +81,7 @@ export async function DELETE(
 
   const { error } = await supabase
     .from('assets')
-    .update({ is_archived: true })
+    .update({ is_archived: true, archived_at: new Date().toISOString() })
     .eq('id', params.id);
 
   if (error) {

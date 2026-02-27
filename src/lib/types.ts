@@ -63,8 +63,21 @@ export interface Asset {
   tags: string[] | null;
   is_archived: boolean;
   notes: string | null;
+  // Version control
+  parent_asset_id: string | null;
+  version: number;
+  // Expiry & license
+  expires_at: string | null;
+  license_notes: string | null;
+  // Archive tracking
+  archived_at: string | null;
+  // Duplicate detection
+  file_hash: string | null;
+  // Joined relations
   slug?: Slug;
   initiative?: Initiative;
+  // Version children (from query)
+  versions?: Asset[];
 }
 
 export interface UserProfile {
@@ -114,4 +127,38 @@ export interface SavedSearch {
   filters: Record<string, string | string[]>;
   created_at: string;
   updated_at: string;
+}
+
+export interface Collection {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  created_by: string | null;
+  is_shared: boolean;
+  created_at: string;
+  updated_at: string;
+  asset_count?: number;
+}
+
+export interface AssetComment {
+  id: string;
+  asset_id: string;
+  user_id: string | null;
+  user_name: string | null;
+  content: string;
+  created_at: string;
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  workspace_id: string;
+  user_id: string | null;
+  user_name: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  entity_name: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }

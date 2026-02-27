@@ -3,6 +3,7 @@ import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { computeAspectRatio, computeDimensionsLabel, computeFileSizeLabel } from '@/lib/aspect-ratio';
 import sharp from 'sharp';
 import JSZip from 'jszip';
+import { createHash } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Allow up to 2 minutes for large uploads
@@ -230,6 +231,10 @@ export async function POST(request: NextRequest) {
       }
 
       const fileSizeLabel = computeFileSizeLabel(file.size);
+
+      // Compute SHA-256 hash for duplicate detection
+      const fileHash = createHash('sha256').update(file.buffer).digest('hex');
+
       const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
 
       // Smart file naming: slug-campaign-date-type-dimensions-[n].ext
@@ -254,6 +259,20 @@ export async function POST(request: NextRequest) {
       const runNumber = String((existingCount || 0) + 1).padStart(2, '0');
       const storedFilename = `${baseName}-${runNumber}.${ext}`;
       const fullPath = `${storagePath}/${storedFilename}`;
+
+      // Check for duplicate file
+      const { data: existingDuplicate } = await supabase
+        .from('assets')
+        .select('id, original_filename, stored_filename')
+        .eq('file_hash', fileHash)
+        .eq('is_archived', false)
+        .limit(1)
+        .single();
+
+      if (existingDuplicate) {
+        errors.push({ file: file.name, error: `קובץ כפול: כבר קיים כ-"${existingDuplicate.original_filename}"` });
+        continue;
+      }
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -298,6 +317,7 @@ export async function POST(request: NextRequest) {
           upload_date: uploadDate,
           uploaded_by: uploadedBy || null,
           tags: tags ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+          file_hash: fileHash,
         })
         .select()
         .single();

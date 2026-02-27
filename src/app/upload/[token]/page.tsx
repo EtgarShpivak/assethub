@@ -156,13 +156,13 @@ export default function ExternalUploadPage() {
             גררו קבצים לכאן או לחצו לבחירה
           </p>
           <p className="text-sm text-ono-gray">
-            JPG, PNG, MP4, MOV, GIF, PDF — עד 2GB לקובץ
+            תמונות, וידאו, PDF, ZIP — עד 2GB לקובץ
           </p>
           <input
             id="ext-file-input"
             type="file"
             multiple
-            accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.webm,.pdf"
+            accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.tif,.heic,.heif,.avif,.mp4,.mov,.webm,.avi,.mpeg,.mpg,.mkv,.3gp,.pdf,.zip"
             className="hidden"
             onChange={handleFileInput}
           />
