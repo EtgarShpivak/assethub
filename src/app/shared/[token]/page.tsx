@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PLATFORMS, FILE_TYPES } from '@/lib/platform-specs';
+import { DOMAIN_CONTEXTS } from '@/lib/platform-specs';
 import type { Asset } from '@/lib/types';
 
 function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -204,7 +205,7 @@ export default function SharedPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-ono-green rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">AH</span>
+                <span className="text-white font-bold text-sm">ONO</span>
               </div>
               <div>
                 <h1 className="text-xl font-bold text-ono-gray-dark">חומרים משותפים</h1>
@@ -283,8 +284,12 @@ export default function SharedPage() {
                   </div>
                 </div>
                 <div className="p-3">
-                  <p className="text-xs font-medium text-ono-gray-dark truncate mb-1">{asset.original_filename}</p>
-                  <div className="flex flex-wrap gap-1">
+                  <p className="text-xs font-medium text-ono-gray-dark truncate mb-1">
+                    {(asset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || asset.original_filename}
+                    {asset.domain_context && ` · ${DOMAIN_CONTEXTS.find(d => d.value === asset.domain_context)?.label || ''}`}
+                  </p>
+                  <p className="text-[10px] text-ono-gray truncate">{asset.original_filename}</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
                     {asset.dimensions_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.dimensions_label}</Badge>}
                     {asset.file_size_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.file_size_label}</Badge>}
                     {asset.platforms?.map(p => <PlatformBadge key={p} platform={p} />)}
@@ -324,7 +329,7 @@ export default function SharedPage() {
 
         {/* Footer */}
         <div className="text-center text-xs text-ono-gray py-4">
-          <p>AssetHub · הקריה האקדמית אונו</p>
+          <p>ניהול מדיה · הקריה האקדמית אונו</p>
         </div>
       </div>
     </div>

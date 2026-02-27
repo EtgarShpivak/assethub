@@ -36,10 +36,11 @@ export const PLATFORM_LABELS: Record<string, string> = {
 
 export const DOMAIN_CONTEXTS = [
   { value: 'social', label: 'סושיאל' },
-  { value: 'display', label: 'דיספליי' },
+  { value: 'display', label: 'שילוט ודיספליי' },
   { value: 'print', label: 'דפוס' },
   { value: 'branding', label: 'מיתוג' },
   { value: 'internal', label: 'פנימי' },
+  { value: 'newsletter', label: 'ידיעונים וברושורים' },
 ] as const;
 
 export const PLATFORMS = [

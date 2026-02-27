@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES, FILE_TYPES, containsHebrew } from '@/lib/platform-specs';
+import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES, containsHebrew } from '@/lib/platform-specs';
 import { computeFileSizeLabel } from '@/lib/aspect-ratio';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import type { Slug, Initiative } from '@/lib/types';
@@ -65,9 +65,11 @@ export default function UploadPage() {
   const [selectedInitiative, setSelectedInitiative] = useState('');
   const [domainContext, setDomainContext] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-  const [tagsInput, setTagsInput] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [assetType, setAssetType] = useState('production');
-  const [fileTypeOverride, setFileTypeOverride] = useState('');
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [uploading, setUploading] = useState(false);
@@ -90,10 +92,12 @@ export default function UploadPage() {
       fetch('/api/workspaces').then(r => r.json()),
       fetch('/api/slugs').then(r => r.json()),
       fetch('/api/initiatives').then(r => r.json()),
-    ]).then(([ws, sl, ini]) => {
+      fetch('/api/tags').then(r => r.json()),
+    ]).then(([ws, sl, ini, tags]) => {
       setWorkspaces(ws);
       setSlugs(sl);
       setInitiatives(ini);
+      setAvailableTags(tags || []);
       if (ws.length > 0 && !selectedWorkspace) setSelectedWorkspace(ws[0].id);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -143,8 +147,7 @@ export default function UploadPage() {
     if (selectedInitiative) formData.append('initiative_id', selectedInitiative);
     if (domainContext) formData.append('domain_context', domainContext);
     if (selectedPlatforms.length > 0) formData.append('platforms', JSON.stringify(selectedPlatforms));
-    if (tagsInput) formData.append('tags', tagsInput);
-    if (fileTypeOverride) formData.append('file_type_override', fileTypeOverride);
+    if (selectedTags.length > 0) formData.append('tags', selectedTags.join(','));
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -317,10 +320,10 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <Label className="flex items-center gap-1">מהלך שיווקי (אופציונלי) <InfoTooltip text="שייכו את החומר למהלך/קמפיין ספציפי. ניתן גם ליצור מהלך חדש ישירות מכאן." /></Label>
+              <Label className="flex items-center gap-1">קמפיין (אופציונלי) <InfoTooltip text="שייכו את החומר לקמפיין ספציפי. ניתן גם ליצור קמפיין חדש ישירות מכאן." /></Label>
               <div className="flex gap-1.5 mt-1">
                 <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} className="flex-1 border border-[#E8E8E8] rounded-md p-2 text-sm">
-                  <option value="">ללא מהלך</option>
+                  <option value="">ללא קמפיין</option>
                   {filteredInitiatives.map(i => (
                     <option key={i.id} value={i.id}>
                       {i.name} ({i.short_code}) {!i.slug_id ? '\uD83C\uDF10' : ''}
@@ -348,15 +351,7 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <Label className="flex items-center gap-1">סוג קובץ <InfoTooltip text="בד&quot;כ המערכת מזהה אוטומטית. בחרו &quot;ידיעונים וברושורים&quot; כדי לסווג ידנית קבצים כמו ניוזלטרים, ברושורים, עלוני מידע." /></Label>
-              <select value={fileTypeOverride} onChange={e => setFileTypeOverride(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
-                <option value="">זיהוי אוטומטי</option>
-                {FILE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <Label className="flex items-center gap-1">הקשר תחומי <InfoTooltip text="מגדיר את סוג השימוש: סושיאל, דיספליי, דפוס, מיתוג או פנימי. עוזר לסנן ולארגן חומרים." /></Label>
+              <Label className="flex items-center gap-1">סוג תוכן <InfoTooltip text="מגדיר את סוג השימוש: סושיאל, שילוט, דפוס, מיתוג, ידיעונים או פנימי. הסוג הטכני (תמונה, PDF, וידאו) מזוהה אוטומטית." /></Label>
               <select value={domainContext} onChange={e => setDomainContext(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
                 <option value="">בחר...</option>
                 {DOMAIN_CONTEXTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
@@ -364,27 +359,99 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <Label className="flex items-center gap-1">תאריך מסמך <InfoTooltip text="תאריך המסמך המקורי. ברירת מחדל: היום. ניתן לשנות לתאריך ישן יותר אם מעלים חומר ישן." /></Label>
+              <Label className="flex items-center gap-1">תאריך המסמך המקורי <InfoTooltip text="תאריך המסמך המקורי. ברירת מחדל: היום. ניתן לשנות לתאריך ישן יותר אם מעלים חומר ישן." /></Label>
               <Input type="date" className="mt-1" value={uploadDate} onChange={e => setUploadDate(e.target.value)} />
               <p className="text-[10px] text-ono-gray mt-0.5">ברירת מחדל: היום. ניתן לשנות.</p>
             </div>
           </div>
 
-          <div>
-            <Label className="mb-2 flex items-center gap-1">פלטפורמות <InfoTooltip text="סמנו את הפלטפורמות שבהן החומר ישמש: META, Google Ads, TikTok, LinkedIn. ניתן לבחור מספר פלטפורמות." /></Label>
-            <div className="flex flex-wrap gap-3">
-              {PLATFORMS.map(p => (
-                <label key={p.value} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={selectedPlatforms.includes(p.value)} onCheckedChange={() => togglePlatform(p.value)} />
-                  <Badge style={{ backgroundColor: `${p.color}20`, color: p.color, borderColor: p.color }} className="border text-xs">{p.label}</Badge>
-                </label>
-              ))}
+          {domainContext === 'social' && (
+            <div>
+              <Label className="mb-2 flex items-center gap-1">פלטפורמות <InfoTooltip text="סמנו את הפלטפורמות שבהן החומר ישמש: META, Google Ads, TikTok, LinkedIn. ניתן לבחור מספר פלטפורמות." /></Label>
+              <div className="flex flex-wrap gap-3">
+                {PLATFORMS.map(p => (
+                  <label key={p.value} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox checked={selectedPlatforms.includes(p.value)} onCheckedChange={() => togglePlatform(p.value)} />
+                    <Badge style={{ backgroundColor: `${p.color}20`, color: p.color, borderColor: p.color }} className="border text-xs">{p.label}</Badge>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
-            <Label className="flex items-center gap-1">תגיות (מופרדות בפסיקים) <InfoTooltip text="הוסיפו מילות מפתח לחיפוש מהיר. הפרידו בפסיקים, למשל: קיץ 2025, קמפוס, תלמידים." /></Label>
-            <Input className="mt-1" placeholder="קיץ 2025, קמפוס, תלמידים" value={tagsInput} onChange={e => setTagsInput(e.target.value)} />
+            <Label className="flex items-center gap-1">תגיות <InfoTooltip text="בחרו תגיות קיימות או הוסיפו חדשות. תגיות עוזרות לחיפוש מהיר של חומרים." /></Label>
+            {/* Selected tags */}
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
+                {selectedTags.map(tag => (
+                  <Badge key={tag} className="bg-ono-green-light text-ono-green-dark border border-ono-green/30 text-xs cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-colors" onClick={() => setSelectedTags(prev => prev.filter(t => t !== tag))}>
+                    {tag} <X className="w-3 h-3 mr-1" />
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {/* Tag input with suggestions */}
+            <div className="relative">
+              <Input
+                className="mt-1"
+                placeholder="הקלידו לחיפוש או הוספת תגית חדשה..."
+                value={tagInput}
+                onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                onFocus={() => setShowTagSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && tagInput.trim()) {
+                    e.preventDefault();
+                    const newTag = tagInput.trim();
+                    if (!selectedTags.includes(newTag)) {
+                      setSelectedTags(prev => [...prev, newTag]);
+                    }
+                    setTagInput('');
+                    setShowTagSuggestions(false);
+                  }
+                }}
+              />
+              {showTagSuggestions && (tagInput || availableTags.length > 0) && (
+                <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-40 overflow-auto">
+                  {availableTags
+                    .filter(t => !selectedTags.includes(t) && (!tagInput || t.includes(tagInput)))
+                    .slice(0, 10)
+                    .map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors"
+                        onMouseDown={e => {
+                          e.preventDefault();
+                          setSelectedTags(prev => [...prev, tag]);
+                          setTagInput('');
+                          setShowTagSuggestions(false);
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  {tagInput.trim() && !availableTags.includes(tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
+                    <button
+                      type="button"
+                      className="w-full text-right px-3 py-1.5 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors border-t border-[#E8E8E8]"
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        setSelectedTags(prev => [...prev, tagInput.trim()]);
+                        setTagInput('');
+                        setShowTagSuggestions(false);
+                      }}
+                    >
+                      + הוסף &quot;{tagInput.trim()}&quot;
+                    </button>
+                  )}
+                  {availableTags.filter(t => !selectedTags.includes(t) && (!tagInput || t.includes(tagInput))).length === 0 && !tagInput.trim() && (
+                    <p className="px-3 py-2 text-xs text-ono-gray">אין תגיות עדיין. הקלידו להוספת תגית חדשה.</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {uploadResults && (
@@ -419,13 +486,13 @@ export default function UploadPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-ono-green" />
-              יצירת מהלך שיווקי מהיר
+              יצירת קמפיין מהיר
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div>
-              <Label className="flex items-center gap-1">שם המהלך * <InfoTooltip text="שם תיאורי בעברית, למשל: קמפיין חזרה ללימודים 2025." /></Label>
+              <Label className="flex items-center gap-1">שם הקמפיין * <InfoTooltip text="שם תיאורי בעברית, למשל: קמפיין חזרה ללימודים 2025." /></Label>
               <Input className="mt-1" placeholder="קמפיין חזרה ללימודים 2025" value={newInitName} onChange={e => setNewInitName(e.target.value)} />
             </div>
 
@@ -456,11 +523,11 @@ export default function UploadPage() {
                 <Checkbox checked={newInitIsCross} onCheckedChange={v => setNewInitIsCross(!!v)} />
                 <span className="text-sm flex items-center gap-1">
                   <Globe className="w-4 h-4 text-ono-orange" />
-                  מהלך רוחבי (חוצה סלאגים)
+                  קמפיין רוחבי (חוצה סלאגים)
                 </span>
               </label>
               {!newInitIsCross && !selectedSlug && (
-                <p className="text-xs text-ono-orange mt-1">יש לבחור סלאג בטופס ההעלאה קודם, או לסמן מהלך רוחבי.</p>
+                <p className="text-xs text-ono-orange mt-1">יש לבחור סלאג בטופס ההעלאה קודם, או לסמן קמפיין רוחבי.</p>
               )}
               {!newInitIsCross && selectedSlug && (
                 <p className="text-xs text-ono-gray mt-1">
@@ -490,7 +557,7 @@ export default function UploadPage() {
               disabled={savingInitiative || !newInitName || !newInitCode || (!newInitIsCross && !selectedSlug)}
               className="bg-ono-green hover:bg-ono-green-dark text-white"
             >
-              {savingInitiative ? 'יוצר...' : 'צור מהלך'}
+              {savingInitiative ? 'יוצר...' : 'צור קמפיין'}
             </Button>
           </DialogFooter>
         </DialogContent>

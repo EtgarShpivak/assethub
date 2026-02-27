@@ -117,12 +117,12 @@ export default function InitiativesPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Megaphone className="w-6 h-6 text-ono-green" />
-          <h1 className="text-2xl font-bold text-ono-gray-dark">מהלכים שיווקיים</h1>
-          <InfoTooltip text="מהלך שיווקי = קמפיין או פרויקט שאליו משייכים חומרים. כל מהלך מקבל שם, קוד קצר באנגלית, ותאריכים." size="md" />
+          <h1 className="text-2xl font-bold text-ono-gray-dark">קמפיינים</h1>
+          <InfoTooltip text="קמפיין = מהלך שיווקי שאליו משייכים חומרים. כל קמפיין מקבל שם, קוד קצר באנגלית, ותאריכים." size="md" />
         </div>
         <Button onClick={() => setShowModal(true)} className="bg-ono-green hover:bg-ono-green-dark text-white">
           <Plus className="w-4 h-4 ml-2" />
-          מהלך חדש
+          קמפיין חדש
         </Button>
       </div>
 
@@ -150,7 +150,7 @@ export default function InitiativesPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-ono-gray">
           <Megaphone className="w-12 h-12 mx-auto mb-3 text-ono-gray/50" />
-          <p>אין מהלכים שיווקיים עדיין</p>
+          <p>אין קמפיינים עדיין</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -207,7 +207,7 @@ export default function InitiativesPage() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
-            <DialogTitle>מהלך שיווקי חדש</DialogTitle>
+            <DialogTitle>קמפיין חדש</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

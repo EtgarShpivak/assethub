@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   FolderOpen,
@@ -9,6 +10,7 @@ import {
   Image as ImageIcon,
   Film,
   FileText,
+  Globe,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
@@ -20,6 +22,7 @@ interface DashboardClientProps {
   unclassifiedCount: number;
   recentAssets: Asset[];
   initiatives: (Initiative & { slugs?: { display_name: string; slug: string } })[];
+  slugs: { id: string; slug: string; display_name: string }[];
 }
 
 const statCards = (totalAssets: number, activeInitiatives: number, unclassifiedCount: number) => [
@@ -31,7 +34,7 @@ const statCards = (totalAssets: number, activeInitiatives: number, unclassifiedC
     bgColor: 'bg-ono-green-light',
   },
   {
-    label: 'מהלכים פעילים',
+    label: 'קמפיינים פעילים',
     value: activeInitiatives,
     icon: Megaphone,
     color: 'text-ono-orange',
@@ -80,14 +83,29 @@ export function DashboardClient({
   unclassifiedCount,
   recentAssets,
   initiatives,
+  slugs,
 }: DashboardClientProps) {
   const cards = statCards(totalAssets, activeInitiatives, unclassifiedCount);
+  const [selectedSlug, setSelectedSlug] = useState<string>('all');
+
+  // Filter assets and initiatives by selected slug
+  const filteredAssets = selectedSlug === 'all'
+    ? recentAssets
+    : selectedSlug === 'cross'
+      ? recentAssets.filter(a => !a.slug_id)
+      : recentAssets.filter(a => a.slug_id === selectedSlug);
+
+  const filteredInitiatives = selectedSlug === 'all'
+    ? initiatives
+    : selectedSlug === 'cross'
+      ? initiatives.filter(i => !i.slug_id)
+      : initiatives.filter(i => i.slug_id === selectedSlug);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-ono-gray-dark">דשבורד</h1>
-        <InfoTooltip text="סקירה כללית של המערכת: חומרים, מהלכים פעילים, העלאות אחרונות וחומרים שממתינים לסיווג." size="md" />
+        <InfoTooltip text="סקירה כללית של המערכת: חומרים, קמפיינים פעילים, העלאות אחרונות וחומרים שממתינים לסיווג." size="md" />
       </div>
 
       {/* Stats cards */}
@@ -119,6 +137,46 @@ export function DashboardClient({
         })}
       </div>
 
+      {/* Faculty tabs */}
+      {slugs.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setSelectedSlug('all')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              selectedSlug === 'all'
+                ? 'bg-ono-green text-white'
+                : 'bg-ono-gray-light text-ono-gray-dark hover:bg-ono-gray-light/80'
+            }`}
+          >
+            הכל
+          </button>
+          {slugs.map(s => (
+            <button
+              key={s.id}
+              onClick={() => setSelectedSlug(s.id)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                selectedSlug === s.id
+                  ? 'bg-ono-green text-white'
+                  : 'bg-ono-gray-light text-ono-gray-dark hover:bg-ono-gray-light/80'
+              }`}
+            >
+              {s.display_name}
+            </button>
+          ))}
+          <button
+            onClick={() => setSelectedSlug('cross')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
+              selectedSlug === 'cross'
+                ? 'bg-ono-orange text-white'
+                : 'bg-ono-gray-light text-ono-gray-dark hover:bg-ono-gray-light/80'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            כללי
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent uploads */}
         <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5">
@@ -128,11 +186,11 @@ export function DashboardClient({
               הצג הכל
             </Link>
           </div>
-          {recentAssets.length === 0 ? (
+          {filteredAssets.length === 0 ? (
             <p className="text-ono-gray text-sm text-center py-8">אין העלאות אחרונות</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {recentAssets.map((asset) => (
+              {filteredAssets.slice(0, 9).map((asset) => (
                 <div
                   key={asset.id}
                   className="border border-[#E8E8E8] rounded-lg p-3 hover:border-ono-green transition-colors"
@@ -164,16 +222,16 @@ export function DashboardClient({
         {/* Active initiatives */}
         <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-ono-gray-dark">מהלכים פעילים</h2>
+            <h2 className="text-lg font-bold text-ono-gray-dark">קמפיינים פעילים</h2>
             <Link href="/initiatives" className="text-sm text-ono-green hover:text-ono-green-dark">
               הצג הכל
             </Link>
           </div>
-          {initiatives.length === 0 ? (
-            <p className="text-ono-gray text-sm text-center py-8">אין מהלכים פעילים</p>
+          {filteredInitiatives.length === 0 ? (
+            <p className="text-ono-gray text-sm text-center py-8">אין קמפיינים פעילים</p>
           ) : (
             <div className="space-y-3">
-              {initiatives.map((initiative) => {
+              {filteredInitiatives.map((initiative) => {
                 const status = statusLabels[initiative.status] || statusLabels.active;
                 return (
                   <Link
@@ -184,7 +242,13 @@ export function DashboardClient({
                     <div>
                       <p className="text-sm font-medium text-ono-gray-dark">{initiative.name}</p>
                       <p className="text-xs text-ono-gray">
-                        {initiative.slugs?.display_name} · {initiative.short_code}
+                        {initiative.slug_id ? initiative.slugs?.display_name : (
+                          <span className="flex items-center gap-1 text-ono-orange">
+                            <Globe className="w-3 h-3" />
+                            רוחבי
+                          </span>
+                        )}
+                        {initiative.slugs?.display_name && ' · '}{initiative.short_code}
                       </p>
                     </div>
                     <Badge className={`${status.className} text-xs`}>

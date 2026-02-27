@@ -65,7 +65,7 @@ const sections: Section[] = [
     description: 'מרכז כל החומרים השיווקיים של הארגון. כאן ניתן לצפות, לחפש, לסנן, להוריד ולשתף את כל החומרים.',
     features: [
       'תצוגה בגריד או ברשימה',
-      'סינון מתקדם לפי סלאג, מהלך שיווקי, סוג קובץ, פלטפורמה, יחס מידות, הקשר תחומי ועוד',
+      'סינון מתקדם לפי סלאג, קמפיין, סוג קובץ, פלטפורמה, יחס מידות, סוג תוכן ועוד',
       'טווח תאריכים עם פריסטים מהירים (שבוע אחרון, חודש אחרון, השנה וכו\')',
       'חיפוש חופשי לפי שם קובץ ותגיות',
       'בחירת מספר חומרים והורדה כ-ZIP',
@@ -92,7 +92,7 @@ const sections: Section[] = [
       'תמיכה ב-JPG, PNG, GIF, WebP, MP4, MOV, WebM, PDF, ZIP',
       'חילוץ אוטומטי של קבצי ZIP - כל קובץ בתוך ה-ZIP יועלה בנפרד',
       'זיהוי אוטומטי של מידות תמונה ויחס מידות',
-      'סיווג חומרים: סלאג, מהלך שיווקי, הקשר תחומי, פלטפורמות, תגיות',
+      'סיווג חומרים: סלאג, קמפיין, סוג תוכן, פלטפורמות, תגיות',
       'בחירת סוג חומר: חומרי הפקה, חומרי מקור, טיוטות',
       'בחירת תאריך מסמך (ברירת מחדל: היום)',
       'העלאה של עד 2GB לקובץ',
@@ -106,18 +106,18 @@ const sections: Section[] = [
   },
   {
     id: 'initiatives',
-    title: 'מהלכים שיווקיים',
+    title: 'קמפיינים',
     icon: <Megaphone className="w-5 h-5" />,
-    description: 'ניהול קמפיינים ומהלכים שיווקיים. כל מהלך מקבל שם, קוד קצר ותאריכים, ומשמש לארגון חומרים.',
+    description: 'ניהול קמפיינים ומהלכים שיווקיים. כל קמפיין מקבל שם, קוד קצר ותאריכים, ומשמש לארגון חומרים.',
     features: [
-      'יצירת מהלך חדש עם שם, קוד קצר, תאריכי התחלה וסיום',
-      'שיוך מהלך לסלאג ספציפי או הגדרתו כ"מהלך רוחבי" (חוצה סלאגים)',
+      'יצירת קמפיין חדש עם שם, קוד קצר, תאריכי התחלה וסיום',
+      'שיוך קמפיין לסלאג ספציפי או הגדרתו כ"קמפיין רוחבי" (חוצה סלאגים)',
       'סינון לפי סטטוס: פעיל, מתמשך, הסתיים, ארכיון',
-      'צפייה בכמות חומרים מקושרים לכל מהלך',
+      'צפייה בכמות חומרים מקושרים לכל קמפיין',
       'קוד קצר באנגלית לשמות קבצי ייצוא',
     ],
     faq: [
-      { question: 'מה זה מהלך רוחבי?', answer: 'מהלך רוחבי הוא מהלך שאינו שייך לסלאג ספציפי אלא חוצה מספר תחומים. לדוגמה: קמפיין כללי של המכללה שמתייחס לכל התוכניות.' },
+      { question: 'מה זה קמפיין רוחבי?', answer: 'קמפיין רוחבי הוא קמפיין שאינו שייך לסלאג ספציפי אלא חוצה מספר תחומים. לדוגמה: קמפיין כללי של המכללה שמתייחס לכל התוכניות.' },
       { question: 'מה זה הקוד הקצר?', answer: 'הקוד הקצר (באנגלית בלבד) משמש בשמות קבצים בעת ייצוא. לדוגמה: "bts25" עבור "חזרה ללימודים 2025". הקוד חייב להיות באותיות קטנות באנגלית ומספרים בלבד.' },
       { question: 'למה אני מקבל שגיאה כשמקליד קוד קצר?', answer: 'שדה הקוד הקצר מקבל רק אותיות קטנות באנגלית ומספרים. אם הקלדת בעברית, המערכת תציג הודעה שמבקשת ממך להחליף שפה למקלדת אנגלית.' },
     ],
@@ -184,102 +184,104 @@ export default function HelpPage() {
   const current = sections.find(s => s.id === activeSection) || sections[0];
 
   return (
-    <div className="flex gap-6 h-full">
-      {/* Main Content */}
-      <div className="flex-1 space-y-6 min-w-0">
-        <div className="flex items-center gap-3">
-          <HelpCircle className="w-6 h-6 text-ono-green" />
-          <h1 className="text-2xl font-bold text-ono-gray-dark">עזרה ותמיכה</h1>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <HelpCircle className="w-6 h-6 text-ono-green" />
+        <h1 className="text-2xl font-bold text-ono-gray-dark">עזרה ותמיכה</h1>
+      </div>
 
-        <p className="text-ono-gray">
-          ברוכים הבאים למדריך השימוש במערכת AssetHub. כאן תמצאו הסברים מפורטים על כל היכולות של המערכת, שאלות נפוצות ותשובות.
-        </p>
+      <p className="text-ono-gray">
+        ברוכים הבאים למדריך השימוש במערכת ניהול מדיה. כאן תמצאו הסברים מפורטים על כל היכולות של המערכת, שאלות נפוצות ותשובות.
+      </p>
 
-        {/* Current Section */}
-        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-ono-green-light rounded-xl flex items-center justify-center text-ono-green">
-              {current.icon}
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-ono-gray-dark">{current.title}</h2>
-              <p className="text-sm text-ono-gray">{current.description}</p>
-            </div>
-          </div>
-
-          {/* Features */}
-          <div>
-            <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-ono-green" />
-              יכולות עיקריות
-            </h3>
-            <ul className="space-y-2">
-              {current.features.map((feature, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-ono-gray-dark">
-                  <span className="text-ono-green mt-0.5 shrink-0">•</span>
-                  {feature}
-                </li>
+      <div className="flex gap-6">
+        {/* Section Navigation - Center */}
+        <div className="w-64 shrink-0">
+          <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 sticky top-4">
+            <h3 className="font-bold text-ono-gray-dark text-sm mb-3 px-2">נושאים</h3>
+            <div className="space-y-1">
+              {sections.map(section => (
+                <button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm transition-colors text-right ${
+                    activeSection === section.id
+                      ? 'bg-ono-green-light text-ono-green-dark font-bold'
+                      : 'text-ono-gray hover:bg-ono-gray-light'
+                  }`}
+                >
+                  {section.icon}
+                  <span>{section.title}</span>
+                </button>
               ))}
-            </ul>
-          </div>
-
-          {/* FAQ */}
-          <div>
-            <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-ono-green" />
-              שאלות נפוצות
-            </h3>
-            <FAQAccordion items={current.faq} />
+            </div>
           </div>
         </div>
 
-        {/* Quick Tips */}
-        <div className="bg-ono-green-light border border-ono-green/20 rounded-lg p-5">
-          <h3 className="font-bold text-ono-green-dark text-sm mb-3">טיפים מהירים</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-              <Download className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>לחצו על חומר כדי לפתוח פרטים מלאים. משם אפשר להוריד, לשתף ולארכב.</span>
+        {/* Content - Left (wider) */}
+        <div className="flex-1 space-y-5 min-w-0">
+          {/* Current Section */}
+          <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-ono-green-light rounded-xl flex items-center justify-center text-ono-green">
+                {current.icon}
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-ono-gray-dark">{current.title}</h2>
+                <p className="text-sm text-ono-gray">{current.description}</p>
+              </div>
             </div>
-            <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-              <Filter className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>השתמשו בפריסטים המהירים לתאריכים כמו &quot;שבוע אחרון&quot; או &quot;השנה&quot; לסינון מהיר.</span>
+
+            {/* Features */}
+            <div>
+              <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-ono-green" />
+                יכולות עיקריות
+              </h3>
+              <ul className="space-y-2">
+                {current.features.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-ono-gray-dark">
+                    <span className="text-ono-green mt-0.5 shrink-0">•</span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-              <Package className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>העלו קובץ ZIP והמערכת תפרק אותו אוטומטית. כל קובץ תמונה/וידאו בתוכו יועלה בנפרד.</span>
+
+            {/* FAQ */}
+            <div>
+              <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-ono-green" />
+                שאלות נפוצות
+              </h3>
+              <FAQAccordion items={current.faq} />
             </div>
-            <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-              <Search className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>שמרו חיפושים שאתם משתמשים בהם לעתים קרובות בלחיצה על סמל הסימנייה.</span>
+          </div>
+
+          {/* Quick Tips */}
+          <div className="bg-ono-green-light border border-ono-green/20 rounded-lg p-5">
+            <h3 className="font-bold text-ono-green-dark text-sm mb-3">טיפים מהירים</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
+                <Download className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>לחצו על חומר כדי לפתוח פרטים מלאים. משם אפשר להוריד, לשתף ולארכב.</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
+                <Filter className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>השתמשו בפריסטים המהירים לתאריכים כמו &quot;שבוע אחרון&quot; או &quot;השנה&quot; לסינון מהיר.</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
+                <Package className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>העלו קובץ ZIP והמערכת תפרק אותו אוטומטית. כל קובץ תמונה/וידאו בתוכו יועלה בנפרד.</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
+                <Search className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>שמרו חיפושים שאתם משתמשים בהם לעתים קרובות בלחיצה על סמל הסימנייה.</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Section Navigation Sidebar */}
-      <aside className="w-56 shrink-0">
-        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-3 sticky top-4">
-          <h3 className="font-bold text-ono-gray-dark text-xs mb-3 px-2">נושאים</h3>
-          <div className="space-y-1">
-            {sections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-colors text-right ${
-                  activeSection === section.id
-                    ? 'bg-ono-green-light text-ono-green-dark font-bold'
-                    : 'text-ono-gray hover:bg-ono-gray-light'
-                }`}
-              >
-                {section.icon}
-                <span>{section.title}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }

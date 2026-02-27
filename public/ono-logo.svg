@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
+  <!-- O -->
+  <circle cx="50" cy="45" r="30" stroke="#6B6B6B" stroke-width="10" fill="none"/>
+  <!-- Play triangle inside O -->
+  <polygon points="42,30 42,60 65,45" fill="#A0C814"/>
+  <!-- n -->
+  <path d="M95 75 V45 C95 30 115 30 115 45 V75" stroke="#6B6B6B" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <!-- o -->
+  <circle cx="150" cy="55" r="20" stroke="#6B6B6B" stroke-width="10" fill="none"/>
+  <!-- Green bar with Hebrew text -->
+  <rect x="0" y="85" width="200" height="25" rx="2" fill="#A0C814"/>
+  <text x="100" y="103" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">הקריה האקדמית אונו</text>
+</svg>

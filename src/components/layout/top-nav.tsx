@@ -34,11 +34,8 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
           <div className="w-8 h-8 bg-ono-green rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">AH</span>
           </div>
-          <span className="font-bold text-lg text-ono-gray-dark">AssetHub</span>
+          <span className="font-bold text-lg text-ono-gray-dark">ניהול מדיה</span>
         </div>
-        <span className="text-xs text-ono-gray border border-[#E8E8E8] rounded px-2 py-0.5">
-          הקריה האקדמית אונו
-        </span>
       </div>
 
       {/* User menu on the left (RTL) */}

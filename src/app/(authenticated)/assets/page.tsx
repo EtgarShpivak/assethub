@@ -134,6 +134,7 @@ export default function AssetLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [slugs, setSlugs] = useState<Slug[]>([]);
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
@@ -170,6 +171,7 @@ export default function AssetLibraryPage() {
   const [copiedShare, setCopiedShare] = useState(false);
 
   const [downloading, setDownloading] = useState(false);
+  const [showDownloadConfirm, setShowDownloadConfirm] = useState<{ count: number; action: () => void } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
   const initialLoad = useRef(true);
 
@@ -234,9 +236,11 @@ export default function AssetLibraryPage() {
     Promise.all([
       fetch('/api/slugs').then(r => r.json()),
       fetch('/api/initiatives').then(r => r.json()),
-    ]).then(([sl, ini]) => {
+      fetch('/api/tags').then(r => r.json()),
+    ]).then(([sl, ini, tags]) => {
       setSlugs(sl);
       setInitiatives(ini);
+      setAvailableTags(tags || []);
       initialLoad.current = false;
     });
   }, []);
@@ -396,6 +400,18 @@ export default function AssetLibraryPage() {
 
   const handleDownloadAllFiltered = async () => {
     if (total === 0) return;
+    // Confirm for >5 files
+    if (total > 5) {
+      setShowDownloadConfirm({
+        count: total,
+        action: () => { setShowDownloadConfirm(null); executeDownloadAll(); },
+      });
+      return;
+    }
+    executeDownloadAll();
+  };
+
+  const executeDownloadAll = async () => {
     setDownloading(true);
     showToast(`מכין הורדה של ${total} חומרים...`, 'info');
     try {
@@ -533,8 +549,17 @@ export default function AssetLibraryPage() {
             <Input className="pr-10" placeholder="חיפוש לפי שם קובץ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
           <div className="relative w-48">
-            <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray" />
-            <Input className="pr-10" placeholder="חיפוש לפי תגית..." value={filterTag} onChange={(e) => setFilterTag(e.target.value)} />
+            <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
+            <select
+              value={filterTag}
+              onChange={(e) => setFilterTag(e.target.value)}
+              className="w-full border border-[#E8E8E8] rounded-md p-2 pr-10 text-sm h-10 appearance-none"
+            >
+              <option value="">כל התגיות</option>
+              {availableTags.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -605,7 +630,10 @@ export default function AssetLibraryPage() {
                   </div>
                 </div>
                 <div className="p-3" onClick={() => setDetailAsset(asset)}>
-                  <p className="text-xs font-medium text-ono-gray-dark truncate mb-1">{asset.original_filename}</p>
+                  <p className="text-xs font-medium text-ono-gray-dark truncate mb-1">
+                    {(asset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || asset.original_filename}
+                    {asset.domain_context && ` · ${DOMAIN_CONTEXTS.find(d => d.value === asset.domain_context)?.label || ''}`}
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {asset.dimensions_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.dimensions_label}</Badge>}
                     {asset.file_size_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.file_size_label}</Badge>}
@@ -705,7 +733,7 @@ export default function AssetLibraryPage() {
           </div>
 
           <MultiCheckboxFilter label="סלאג" options={slugOptions} selected={filterSlugs} onChange={v => { setFilterSlugs(v); setPage(1); }} />
-          <MultiCheckboxFilter label="מהלך שיווקי" options={initiativeOptions} selected={filterInitiatives} onChange={v => { setFilterInitiatives(v); setPage(1); }} />
+          <MultiCheckboxFilter label="קמפיין" options={initiativeOptions} selected={filterInitiatives} onChange={v => { setFilterInitiatives(v); setPage(1); }} />
           <MultiCheckboxFilter label="סוג קובץ" options={FILE_TYPES} selected={filterFileTypes} onChange={v => { setFilterFileTypes(v); setPage(1); }} />
           <MultiCheckboxFilter label="סוג חומר" options={ASSET_TYPES} selected={filterAssetTypes} onChange={v => { setFilterAssetTypes(v); setPage(1); }} />
           <MultiCheckboxFilter label="פלטפורמה" options={[...PLATFORMS, { value: 'none', label: 'ללא שיוך', color: '#888' } as { value: string; label: string; color: string }]} selected={filterPlatforms} onChange={v => { setFilterPlatforms(v); setPage(1); }} />
@@ -716,7 +744,7 @@ export default function AssetLibraryPage() {
             <Input dir="ltr" className="text-left text-xs mt-1" placeholder="1080×1920" value={filterDimensions} onChange={e => { setFilterDimensions(e.target.value); setPage(1); }} />
           </div>
 
-          <MultiCheckboxFilter label="הקשר תחומי" options={DOMAIN_CONTEXTS} selected={filterDomainContexts} onChange={v => { setFilterDomainContexts(v); setPage(1); }} />
+          <MultiCheckboxFilter label="סוג תוכן" options={DOMAIN_CONTEXTS} selected={filterDomainContexts} onChange={v => { setFilterDomainContexts(v); setPage(1); }} />
         </div>
       </aside>
 
@@ -742,9 +770,9 @@ export default function AssetLibraryPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div><span className="text-ono-gray">סלאג:</span><span className="mr-2 text-ono-gray-dark">{(detailAsset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || '—'}</span></div>
-                  <div><span className="text-ono-gray">מהלך:</span><span className="mr-2 text-ono-gray-dark">{(detailAsset as Asset & { initiatives?: { name: string } }).initiatives?.name || '—'}</span></div>
+                  <div><span className="text-ono-gray">קמפיין:</span><span className="mr-2 text-ono-gray-dark">{(detailAsset as Asset & { initiatives?: { name: string } }).initiatives?.name || '—'}</span></div>
                   <div><span className="text-ono-gray">סוג קובץ:</span><span className="mr-2 text-ono-gray-dark">{FILE_TYPES.find(f => f.value === detailAsset.file_type)?.label}</span></div>
-                  <div><span className="text-ono-gray">הקשר:</span><span className="mr-2 text-ono-gray-dark">{DOMAIN_CONTEXTS.find(d => d.value === detailAsset.domain_context)?.label || '—'}</span></div>
+                  <div><span className="text-ono-gray">סוג תוכן:</span><span className="mr-2 text-ono-gray-dark">{DOMAIN_CONTEXTS.find(d => d.value === detailAsset.domain_context)?.label || '—'}</span></div>
                   <div><span className="text-ono-gray">תאריך:</span><span className="mr-2 text-ono-gray-dark">{new Date(detailAsset.upload_date).toLocaleDateString('he-IL')}</span></div>
                   <div><span className="text-ono-gray">תגיות:</span><span className="mr-2 text-ono-gray-dark">{detailAsset.tags?.join(', ') || '—'}</span></div>
                 </div>
@@ -819,6 +847,22 @@ export default function AssetLibraryPage() {
               </Button>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Download Confirmation Dialog */}
+      <Dialog open={!!showDownloadConfirm} onOpenChange={() => setShowDownloadConfirm(null)}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader><DialogTitle>אישור הורדה</DialogTitle></DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-ono-gray">
+              אתה עומד להוריד {showDownloadConfirm?.count} קבצים כקובץ ZIP. האם להמשיך?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDownloadConfirm(null)}>ביטול</Button>
+            <Button onClick={() => showDownloadConfirm?.action()} className="bg-ono-green hover:bg-ono-green-dark text-white">הורד</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
