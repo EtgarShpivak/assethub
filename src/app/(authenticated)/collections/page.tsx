@@ -17,7 +17,6 @@ import {
   File,
   X,
   CheckCircle,
-  AlertTriangle,
   Users,
   Lock,
 } from 'lucide-react';
@@ -32,27 +31,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useGlobalToast } from '@/components/ui/global-toast';
+import { logClientError } from '@/lib/error-logger';
 import type { Collection, Asset } from '@/lib/types';
 
-// ─── Toast ───────────────────────────────────────────────────────────────────
-
-function Toast({ message, type = 'info', onClose }: { message: string; type?: 'info' | 'success' | 'error'; onClose: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const bg = type === 'success' ? 'bg-ono-green text-white' : type === 'error' ? 'bg-red-500 text-white' : 'bg-ono-gray-dark text-white';
-
-  return (
-    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 ${bg} px-5 py-3 rounded-lg shadow-lg flex items-center gap-2 text-sm animate-in fade-in slide-in-from-bottom-4`}>
-      {type === 'success' && <CheckCircle className="w-4 h-4" />}
-      {type === 'error' && <AlertTriangle className="w-4 h-4" />}
-      {message}
-      <button onClick={onClose} className="mr-2 hover:opacity-70"><X className="w-3 h-3" /></button>
-    </div>
-  );
-}
+// Toast is now provided globally via ToastProvider in app-layout
 
 // ─── File type icon helper ───────────────────────────────────────────────────
 
@@ -106,11 +89,13 @@ export default function CollectionsPage() {
   const [addingAssets, setAddingAssets] = useState(false);
 
   // ── Toast ───────────────────────────────────────────────────────────────────
-  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
+  const { showError: _showError, showSuccess: _showSuccess, showInfo: _showInfo } = useGlobalToast();
 
   const showToast = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setToast({ message, type });
-  }, []);
+    if (type === 'error') { _showError(message); logClientError('collections', message); }
+    else if (type === 'success') _showSuccess(message);
+    else _showInfo(message);
+  }, [_showError, _showSuccess, _showInfo]);
 
   // ── Fetch collections ──────────────────────────────────────────────────────
 
@@ -639,7 +624,7 @@ export default function CollectionsPage() {
         </Dialog>
 
         {/* Toast */}
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        {/* Toast is now global via ToastProvider */}
       </div>
     );
   }
@@ -864,8 +849,7 @@ export default function CollectionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Toast */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {/* Toast is now global via ToastProvider */}
     </div>
   );
 }

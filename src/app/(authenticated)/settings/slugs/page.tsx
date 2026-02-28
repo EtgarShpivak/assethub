@@ -14,6 +14,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { useGlobalToast } from '@/components/ui/global-toast';
+import { logClientError } from '@/lib/error-logger';
 import type { Slug } from '@/lib/types';
 
 interface SlugWithCounts extends Slug {
@@ -125,6 +127,8 @@ function SlugTreeNode({
 }
 
 export default function SlugManagerPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { showError, showSuccess } = useGlobalToast();
   const [slugs, setSlugs] = useState<SlugWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -202,7 +206,9 @@ export default function SlugManagerPage() {
     const res = await fetch(`/api/slugs/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const data = await res.json();
-      alert(data.error);
+      const errMsg = data.error || 'שגיאה במחיקת הסלאג';
+      showError(errMsg, undefined, data.error?.includes('חומרים') ? 'העבר או מחק את כל החומרים לפני מחיקת הסלאג.' : 'נסה שוב.');
+      logClientError('slug-delete', errMsg);
       return;
     }
     fetchSlugs();

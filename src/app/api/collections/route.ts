@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logServerError } from '@/lib/error-logger-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +68,20 @@ export async function POST(request: NextRequest) {
       collection_id: collection.id,
       asset_id,
     }));
-    await supabase.from('collection_assets').insert(rows);
+    const { error: assetsError } = await supabase.from('collection_assets').insert(rows);
+    if (assetsError) {
+      await logServerError({
+        context: 'collection-add-assets',
+        errorMessage: `Failed to add assets to collection: ${assetsError.message}`,
+        userId: user.id,
+        entityType: 'collection',
+        entityId: collection.id,
+        entityName: name,
+        extra: { asset_ids },
+      });
+      // Return the collection anyway but include a warning
+      return NextResponse.json({ ...collection, warning: 'האוסף נוצר אך חלק מהחומרים לא נוספו' });
+    }
   }
 
   return NextResponse.json(collection);

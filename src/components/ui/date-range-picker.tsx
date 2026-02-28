@@ -142,6 +142,9 @@ export function DateRangePicker({ dateFrom, dateTo, onDateChange }: DateRangePic
   const [open, setOpen] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   // Calendar navigation
   const now = new Date();
@@ -159,10 +162,43 @@ export function DateRangePicker({ dateFrom, dateTo, onDateChange }: DateRangePic
     setTempTo(dateTo);
   }, [dateFrom, dateTo]);
 
-  // Click outside
+  // Calculate popup position when opening
+  useEffect(() => {
+    if (open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const popupWidth = 720; // approximate width of the popup
+      const popupHeight = 420; // approximate height of the popup
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+
+      let top = rect.bottom + 4;
+      let left = rect.left;
+
+      // If popup would overflow bottom, show above
+      if (top + popupHeight > viewportH) {
+        top = Math.max(8, rect.top - popupHeight - 4);
+      }
+      // If popup would overflow right
+      if (left + popupWidth > viewportW) {
+        left = Math.max(8, viewportW - popupWidth - 8);
+      }
+      // If popup would overflow left
+      if (left < 8) left = 8;
+
+      setPopupPos({ top, left });
+    }
+  }, [open]);
+
+  // Click outside — check both the wrapper ref and the popup ref
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        ref.current && !ref.current.contains(target) &&
+        popupRef.current && !popupRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -227,6 +263,7 @@ export function DateRangePicker({ dateFrom, dateTo, onDateChange }: DateRangePic
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
         className={`w-full flex items-center gap-2 border rounded-md p-2 text-sm transition-colors ${
           open ? 'border-ono-green ring-2 ring-ono-green/20' : 'border-[#E8E8E8] hover:border-ono-green'
@@ -237,7 +274,12 @@ export function DateRangePicker({ dateFrom, dateTo, onDateChange }: DateRangePic
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 bg-white border border-[#E8E8E8] rounded-lg shadow-xl flex" dir="ltr">
+        <div
+          ref={popupRef}
+          className="fixed z-[200] bg-white border border-[#E8E8E8] rounded-lg shadow-xl flex"
+          dir="ltr"
+          style={{ top: popupPos.top, left: popupPos.left }}
+        >
           {/* Presets sidebar */}
           <div className="w-44 border-r border-[#E8E8E8] py-2 max-h-[380px] overflow-auto">
             {PRESETS.map(preset => (

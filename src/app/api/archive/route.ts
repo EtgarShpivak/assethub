@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logServerError } from '@/lib/error-logger-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,12 @@ export async function GET(request: NextRequest) {
     .order(sortBy, { ascending: sortDir });
 
   if (error) {
+    await logServerError({
+      context: 'archive-list',
+      errorMessage: `Failed to fetch archived assets: ${error.message}`,
+      userId: user.id,
+      entityType: 'asset',
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -49,6 +56,13 @@ export async function POST(request: NextRequest) {
       .in('id', asset_ids);
 
     if (error) {
+      await logServerError({
+        context: 'archive-restore',
+        errorMessage: `Failed to restore assets: ${error.message}`,
+        userId: user.id,
+        entityType: 'asset',
+        extra: { asset_ids },
+      });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ restored: asset_ids.length });
@@ -67,7 +81,17 @@ export async function POST(request: NextRequest) {
         .map(a => a.drive_file_id)
         .filter(Boolean) as string[];
       if (paths.length > 0) {
-        await supabase.storage.from('assets').remove(paths);
+        const { error: storageError } = await supabase.storage.from('assets').remove(paths);
+        if (storageError) {
+          await logServerError({
+            context: 'archive-permanent-delete',
+            errorMessage: `Failed to remove files from storage: ${storageError.message}`,
+            userId: user.id,
+            entityType: 'asset',
+            extra: { paths, asset_ids },
+          });
+          // Continue with DB deletion even if storage fails - log the warning
+        }
       }
     }
 
@@ -78,6 +102,13 @@ export async function POST(request: NextRequest) {
       .in('id', asset_ids);
 
     if (error) {
+      await logServerError({
+        context: 'archive-permanent-delete',
+        errorMessage: `Failed to delete assets from DB: ${error.message}`,
+        userId: user.id,
+        entityType: 'asset',
+        extra: { asset_ids },
+      });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ deleted: asset_ids.length });

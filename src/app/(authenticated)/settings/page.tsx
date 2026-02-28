@@ -34,6 +34,8 @@ import {
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { useGlobalToast } from '@/components/ui/global-toast';
+import { logClientError } from '@/lib/error-logger';
 import type { Slug, Initiative, UserProfile } from '@/lib/types';
 
 interface UploadTokenEntry {
@@ -64,6 +66,8 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export default function SettingsPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { showError, showSuccess } = useGlobalToast();
   const [tokens, setTokens] = useState<UploadTokenEntry[]>([]);
   const [slugs, setSlugs] = useState<Slug[]>([]);
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
@@ -131,9 +135,11 @@ export default function SettingsPage() {
       if (res.ok) {
         const profile = await res.json();
         setCurrentUser(profile);
+      } else if (res.status === 401) {
+        showError('פג תוקף ההתחברות', 'יש להתחבר מחדש למערכת.', 'רענן את הדף והתחבר מחדש.');
       }
     } catch {
-      // Fallback: will try to get from users list
+      logClientError('settings-fetch-profile', 'Failed to fetch user profile');
     }
   };
 
@@ -147,7 +153,9 @@ export default function SettingsPage() {
           return data as UserProfile[];
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      logClientError('settings-fetch-users', 'Failed to fetch users list');
+    }
     return [] as UserProfile[];
   };
 

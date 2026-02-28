@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { computeAspectRatio, computeDimensionsLabel, computeFileSizeLabel } from '@/lib/aspect-ratio';
+import { logServerError } from '@/lib/error-logger-server';
 import sharp from 'sharp';
 import JSZip from 'jszip';
 import { createHash } from 'crypto';
@@ -237,15 +238,21 @@ export async function POST(request: NextRequest) {
 
       const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
 
-      // Smart file naming: slug-campaign-date-type-dimensions-[n].ext
+      // Smart file naming: slug-campaign-date-type-ratiosize-[n].ext
       const dateStr = uploadDate.split('T')[0].replace(/-/g, '');
-      const dimPart = width && height ? `${width}x${height}` : 'nodim';
+      // Build ratiosize part: e.g. "1x1_1080x1080", "16x9_1920x1080", or "nodim"
+      let ratioSizePart = 'nodim';
+      if (width && height) {
+        const ratioPart = aspectRatio ? aspectRatio.replace(':', 'x') : null;
+        const sizePart = `${width}x${height}`;
+        ratioSizePart = ratioPart ? `${ratioPart}_${sizePart}` : sizePart;
+      }
       const baseName = [
         slug.slug,
         initiative?.short_code || 'standalone',
         dateStr,
         fileType,
-        dimPart,
+        ratioSizePart,
       ].join('-');
 
       // Count existing files with same base to generate running number
@@ -284,7 +291,15 @@ export async function POST(request: NextRequest) {
 
       if (uploadError) {
         console.error('Storage upload error:', uploadError);
-        errors.push({ file: file.name, error: `שגיאה בהעלאה: ${uploadError.message}` });
+        errors.push({ file: file.name, error: `שגיאה בהעלאה לאחסון: ${uploadError.message}. נסה שוב או בדוק שהאחסון אינו מלא.` });
+        await logServerError({
+          context: 'upload-storage',
+          errorMessage: `Storage upload failed for ${file.name}: ${uploadError.message}`,
+          userId: user.id,
+          entityType: 'asset',
+          entityName: file.name,
+          extra: { path: fullPath, mimeType: file.mimeType, size: file.size },
+        });
         continue;
       }
 
@@ -323,13 +338,29 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (dbError) {
-        errors.push({ file: file.name, error: dbError.message });
+        errors.push({ file: file.name, error: `שגיאה בשמירת פרטי הקובץ: ${dbError.message}. הקובץ הועלה לאחסון אך לא נרשם במערכת.` });
+        await logServerError({
+          context: 'upload-database',
+          errorMessage: `DB insert failed for ${file.name}: ${dbError.message}`,
+          userId: user.id,
+          entityType: 'asset',
+          entityName: file.name,
+          extra: { storedFilename, fullPath },
+        });
       } else {
         results.push(asset);
       }
     } catch (err) {
       console.error('Upload error:', err);
-      errors.push({ file: file.name, error: String(err) });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      errors.push({ file: file.name, error: `שגיאה כללית בהעלאה: ${errMsg}` });
+      await logServerError({
+        context: 'upload-general',
+        errorMessage: `Upload failed for ${file.name}: ${errMsg}`,
+        userId: user.id,
+        entityType: 'asset',
+        entityName: file.name,
+      });
     }
   }
 

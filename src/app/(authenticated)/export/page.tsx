@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useGlobalToast } from '@/components/ui/global-toast';
+import { logClientError } from '@/lib/error-logger';
 import { PLATFORMS, PLATFORM_SPECS } from '@/lib/platform-specs';
 import type { Asset, Slug, Initiative } from '@/lib/types';
 
@@ -132,6 +134,8 @@ export default function ExportPage() {
     generatePreview();
   }, [generatePreview]);
 
+  const { showError, showSuccess } = useGlobalToast();
+
   const handleExport = async () => {
     if (selectedForExport.size === 0 || !selectedPlatform || !selectedWorkspace) return;
     setExporting(true);
@@ -148,8 +152,10 @@ export default function ExportPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        alert(err.error || 'שגיאה בייצוא');
+        const err = await res.json().catch(() => ({}));
+        const errMsg = err.error || 'שגיאה בייצוא';
+        showError('שגיאה בייצוא', errMsg, 'נסה שוב עם פחות קבצים, או בדוק שכל הקבצים קיימים באחסון.');
+        await logClientError('export', errMsg, `platform: ${selectedPlatform}`);
         setExporting(false);
         return;
       }
@@ -164,8 +170,10 @@ export default function ExportPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
-      alert('שגיאה בייצוא');
+      showSuccess('הייצוא הושלם', `${selectedForExport.size} קבצים יוצאו בהצלחה.`);
+    } catch (err) {
+      showError('שגיאה בייצוא', 'לא ניתן היה לייצא את החבילה.', 'בדוק את חיבור האינטרנט ונסה שוב.');
+      await logClientError('export', err instanceof Error ? err.message : 'Unknown export error');
     }
 
     setExporting(false);

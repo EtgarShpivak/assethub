@@ -48,6 +48,8 @@ import { DOMAIN_CONTEXTS, PLATFORMS, FILE_TYPES, ASPECT_RATIOS, ASSET_TYPES } fr
 import { createClient } from '@/lib/supabase/client';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { useGlobalToast } from '@/components/ui/global-toast';
+import { logClientError } from '@/lib/error-logger';
 import type { Asset, Slug, Initiative, SavedSearch, AssetComment } from '@/lib/types';
 
 function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -112,24 +114,7 @@ function MultiCheckboxFilter({
   );
 }
 
-// Toast notification component
-function Toast({ message, type = 'info', onClose }: { message: string; type?: 'info' | 'success' | 'error'; onClose: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const bg = type === 'success' ? 'bg-ono-green text-white' : type === 'error' ? 'bg-red-500 text-white' : 'bg-ono-gray-dark text-white';
-
-  return (
-    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 ${bg} px-5 py-3 rounded-lg shadow-lg flex items-center gap-2 text-sm animate-in fade-in slide-in-from-bottom-4`}>
-      {type === 'success' && <CheckCircle className="w-4 h-4" />}
-      {type === 'error' && <AlertTriangle className="w-4 h-4" />}
-      {message}
-      <button onClick={onClose} className="ml-2 hover:opacity-70"><X className="w-3 h-3" /></button>
-    </div>
-  );
-}
+// Toast is now provided globally via ToastProvider in app-layout
 
 export default function AssetLibraryPage() {
   const searchParams = useSearchParams();
@@ -180,7 +165,6 @@ export default function AssetLibraryPage() {
   const [showDownloadConfirm, setShowDownloadConfirm] = useState<{ count: number; action: () => void } | null>(null);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState<Asset | null>(null);
   const [showFilterSidebar, setShowFilterSidebar] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
   const initialLoad = useRef(true);
 
   // Edit mode for detail modal
@@ -205,9 +189,14 @@ export default function AssetLibraryPage() {
   const [newComment, setNewComment] = useState('');
   const [commentsLoading, setCommentsLoading] = useState(false);
 
+  const { showError: _showError, showSuccess: _showSuccess, showInfo: _showInfo } = useGlobalToast();
+
+  // Bridge: map old showToast(msg, type) API to global toast
   const showToast = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setToast({ message, type });
-  }, []);
+    if (type === 'error') _showError(message);
+    else if (type === 'success') _showSuccess(message);
+    else _showInfo(message);
+  }, [_showError, _showSuccess, _showInfo]);
 
   // Get user ID from Supabase auth
   useEffect(() => {
@@ -252,12 +241,13 @@ export default function AssetLibraryPage() {
       setAssets(data.assets || []);
       setTotal(data.total || 0);
     } catch {
-      showToast('שגיאה בטעינת חומרים', 'error');
+      _showError('שגיאה בטעינת חומרים', 'לא ניתן היה לטעון את הנתונים מהשרת.', 'רענן את הדף ונסה שוב. אם הבעיה נמשכת, פנה למנהל המערכת.');
+      logClientError('assets-fetch', 'Failed to fetch assets');
     }
     setLoading(false);
   }, [searchQuery, filterSlugs, filterInitiatives, filterFileTypes, filterPlatforms,
       filterAspectRatios, filterDomainContexts, filterAssetTypes, filterDimensions,
-      filterDateFrom, filterDateTo, filterTag, page, sortBy, sortDir, searchParams, showToast]);
+      filterDateFrom, filterDateTo, filterTag, page, sortBy, sortDir, searchParams, showToast, _showError]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -387,7 +377,8 @@ export default function AssetLibraryPage() {
       URL.revokeObjectURL(url);
       showToast('הקובץ הורד בהצלחה', 'success');
     } catch {
-      showToast('שגיאה בהורדת הקובץ. נסה שוב.', 'error');
+      _showError('שגיאה בהורדת הקובץ', 'לא ניתן היה להוריד את הקובץ מהאחסון.', 'נסה שוב. אם הבעיה נמשכת, ייתכן שהקובץ נמחק מהאחסון.');
+      logClientError('download-single', `Failed to download: ${asset.original_filename}`, asset.original_filename);
     }
   };
 
@@ -1251,8 +1242,7 @@ export default function AssetLibraryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Toast */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {/* Toast is now global via ToastProvider */}
     </div>
   );
 }

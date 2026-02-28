@@ -30,6 +30,8 @@ import {
 import { DOMAIN_CONTEXTS, PLATFORMS, ASSET_TYPES, containsHebrew } from '@/lib/platform-specs';
 import { computeFileSizeLabel } from '@/lib/aspect-ratio';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { useGlobalToast } from '@/components/ui/global-toast';
+import { logClientError } from '@/lib/error-logger';
 import type { Slug, Initiative } from '@/lib/types';
 
 interface FileEntry {
@@ -87,6 +89,8 @@ export default function UploadPage() {
   const [savingInitiative, setSavingInitiative] = useState(false);
   const [initError, setInitError] = useState('');
 
+  const { showError, showSuccess, showWarning } = useGlobalToast();
+
   const fetchData = useCallback(() => {
     Promise.all([
       fetch('/api/workspaces').then(r => r.json()),
@@ -99,6 +103,9 @@ export default function UploadPage() {
       setInitiatives(ini);
       setAvailableTags(tags || []);
       if (ws.length > 0 && !selectedWorkspace) setSelectedWorkspace(ws[0].id);
+    }).catch(() => {
+      showError('שגיאה בטעינת נתוני הטופס', 'לא ניתן היה לטעון סלאגים, קמפיינים ותגיות.', 'רענן את הדף ונסה שוב.');
+      logClientError('upload-fetch-data', 'Failed to load upload form data');
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -151,6 +158,21 @@ export default function UploadPage() {
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        showError(
+          'שגיאה בהעלאה',
+          errData.error || 'השרת החזיר שגיאה.',
+          res.status === 401 ? 'התחבר מחדש ונסה שוב.' : 'בדוק שכל שדות החובה מלאים ונסה שוב.',
+        );
+        await logClientError('upload', errData.error || `HTTP ${res.status}`, `${files.length} files`);
+        files.forEach((_, i) => { progress[i] = 'error'; });
+        setUploadProgress({ ...progress });
+        setUploading(false);
+        return;
+      }
+
       const result = await res.json();
 
       files.forEach((f, i) => {
@@ -161,9 +183,30 @@ export default function UploadPage() {
         uploaded: result.uploaded?.length || 0,
         errors: result.errors?.length || 0,
       });
-    } catch {
+
+      // Show detailed feedback
+      const uploadedCount = result.uploaded?.length || 0;
+      const errorCount = result.errors?.length || 0;
+      if (uploadedCount > 0 && errorCount === 0) {
+        showSuccess(`${uploadedCount} קבצים הועלו בהצלחה`);
+      } else if (uploadedCount > 0 && errorCount > 0) {
+        showWarning(
+          `${uploadedCount} קבצים הועלו, ${errorCount} נכשלו`,
+          result.errors.map((e: { file: string; error: string }) => `${e.file}: ${e.error}`).join(' | '),
+          'בדוק את הקבצים שנכשלו ונסה להעלות אותם שוב.',
+        );
+      } else if (errorCount > 0) {
+        showError(
+          'כל הקבצים נכשלו בהעלאה',
+          result.errors.map((e: { file: string; error: string }) => `${e.file}: ${e.error}`).join(' | '),
+          'בדוק את סוג הקבצים ואת הגודל ונסה שוב.',
+        );
+      }
+    } catch (err) {
       files.forEach((_, i) => { progress[i] = 'error'; });
       setUploadProgress({ ...progress });
+      showError('שגיאת תקשורת', 'לא ניתן היה להתחבר לשרת.', 'בדוק את חיבור האינטרנט ונסה שוב.');
+      await logClientError('upload-network', err instanceof Error ? err.message : 'Network error');
     }
 
     setUploading(false);
