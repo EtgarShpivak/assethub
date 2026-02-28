@@ -78,6 +78,7 @@ export default function UploadPage() {
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, 'pending' | 'uploading' | 'done' | 'error'>>({});
+  const [filePercent, setFilePercent] = useState<Record<number, number>>({}); // per-file 0-100
   const [uploadResults, setUploadResults] = useState<{ uploaded: number; errors: number } | null>(null);
 
   // Quick initiative creation
@@ -244,7 +245,7 @@ export default function UploadPage() {
             setUploadProgress({ ...progress });
           }
 
-          // B2: Upload each file directly to Supabase via signed URL
+          // B2: Upload each file directly to Supabase via signed URL (XHR for progress)
           const successfulUploads: typeof prepareData.files = [];
           for (const prepared of prepareData.files || []) {
             const fileEntry = directFiles.find(f => f.name === prepared.originalName);
@@ -252,20 +253,41 @@ export default function UploadPage() {
             if (!fileEntry || fileIdx < 0) continue;
 
             try {
-              const uploadRes = await fetch(prepared.signedUrl, {
-                method: 'PUT',
-                headers: { 'Content-Type': fileEntry.type || 'application/octet-stream' },
-                body: fileEntry.file,
-              });
+              await new Promise<void>((resolve) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', prepared.signedUrl);
+                xhr.setRequestHeader('Content-Type', fileEntry.type || 'application/octet-stream');
 
-              if (uploadRes.ok) {
-                progress[fileIdx] = 'done';
-                successfulUploads.push(prepared);
-              } else {
-                progress[fileIdx] = 'error';
-                totalErrors++;
-                allErrorDetails.push({ file: prepared.originalName, error: `שגיאה בהעלאה ישירה (${uploadRes.status})` });
-              }
+                xhr.upload.onprogress = (e) => {
+                  if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    setFilePercent(prev => ({ ...prev, [fileIdx]: pct }));
+                  }
+                };
+
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    progress[fileIdx] = 'done';
+                    setFilePercent(prev => ({ ...prev, [fileIdx]: 100 }));
+                    successfulUploads.push(prepared);
+                    resolve();
+                  } else {
+                    progress[fileIdx] = 'error';
+                    totalErrors++;
+                    allErrorDetails.push({ file: prepared.originalName, error: `שגיאה בהעלאה ישירה (${xhr.status})` });
+                    resolve();
+                  }
+                };
+
+                xhr.onerror = () => {
+                  progress[fileIdx] = 'error';
+                  totalErrors++;
+                  allErrorDetails.push({ file: prepared.originalName, error: 'שגיאת רשת בהעלאה' });
+                  resolve();
+                };
+
+                xhr.send(fileEntry.file);
+              });
             } catch {
               progress[fileIdx] = 'error';
               totalErrors++;
@@ -461,21 +483,35 @@ export default function UploadPage() {
           </div>
           <div className="divide-y divide-[#E8E8E8] max-h-60 overflow-auto">
             {files.map((f, i) => (
-              <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${f.error ? 'bg-red-50' : ''}`}>
-                <div className="flex items-center gap-3">
-                  <FileTypeIcon type={f.type} filename={f.name} />
-                  <div>
-                    <p className="text-sm text-ono-gray-dark">{f.name}</p>
-                    <p className="text-xs text-ono-gray">{computeFileSizeLabel(f.size)}</p>
-                    {f.error && <p className="text-xs text-red-600 mt-0.5">{f.error}</p>}
+              <div key={i} className={`px-4 py-2.5 ${f.error ? 'bg-red-50' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <FileTypeIcon type={f.type} filename={f.name} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-ono-gray-dark truncate">{f.name}</p>
+                      <p className="text-xs text-ono-gray">{computeFileSizeLabel(f.size)}</p>
+                      {f.error && <p className="text-xs text-red-600 mt-0.5">{f.error}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mr-2">
+                    {uploadProgress[i] === 'done' && <CheckCircle className="w-4 h-4 text-ono-green" />}
+                    {uploadProgress[i] === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
+                    {uploadProgress[i] === 'uploading' && (
+                      <span className="text-xs text-ono-green font-medium min-w-[32px] text-left">
+                        {filePercent[i] != null ? `${filePercent[i]}%` : ''}
+                      </span>
+                    )}
+                    {!uploading && <Button variant="ghost" size="sm" onClick={() => removeFile(i)}><X className="w-4 h-4 text-ono-gray" /></Button>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {uploadProgress[i] === 'done' && <CheckCircle className="w-4 h-4 text-ono-green" />}
-                  {uploadProgress[i] === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
-                  {uploadProgress[i] === 'uploading' && <div className="w-4 h-4 border-2 border-ono-green border-t-transparent rounded-full animate-spin" />}
-                  <Button variant="ghost" size="sm" onClick={() => removeFile(i)}><X className="w-4 h-4 text-ono-gray" /></Button>
-                </div>
+                {uploadProgress[i] === 'uploading' && filePercent[i] != null && (
+                  <div className="mt-1.5 w-full bg-[#E8E8E8] rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="h-full bg-ono-green rounded-full transition-all duration-200"
+                      style={{ width: `${filePercent[i]}%` }}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -642,7 +678,47 @@ export default function UploadPage() {
             </div>
           </div>
 
-          {uploadResults && (
+          {/* Upload progress bar */}
+          {uploading && files.length > 0 && (() => {
+            const total = files.filter(f => !f.error).length;
+            const done = Object.values(uploadProgress).filter(s => s === 'done').length;
+            const errored = Object.values(uploadProgress).filter(s => s === 'error').length - files.filter(f => f.error).length;
+            const completed = done + Math.max(0, errored);
+            const overallPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+            // For files currently uploading, factor in their individual progress
+            let weightedPct = 0;
+            if (total > 0) {
+              let sumPct = 0;
+              files.forEach((f, i) => {
+                if (f.error) return;
+                if (uploadProgress[i] === 'done') sumPct += 100;
+                else if (uploadProgress[i] === 'error') sumPct += 100;
+                else if (uploadProgress[i] === 'uploading') sumPct += (filePercent[i] || 0);
+              });
+              weightedPct = Math.round(sumPct / total);
+            }
+            const displayPct = Math.max(overallPct, weightedPct);
+
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ono-gray-dark font-medium">מעלה קבצים...</span>
+                  <span className="text-ono-gray">{done}/{total} הושלמו · {displayPct}%</span>
+                </div>
+                <div className="w-full bg-[#E8E8E8] rounded-full h-3 overflow-hidden">
+                  <div
+                    className="h-full bg-ono-green rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${displayPct}%` }}
+                  />
+                </div>
+                {errored > 0 && (
+                  <p className="text-xs text-red-500">{errored} קבצים נכשלו</p>
+                )}
+              </div>
+            );
+          })()}
+
+          {uploadResults && !uploading && (
             <div className={`p-3 rounded-lg ${uploadResults.errors > 0 ? 'bg-ono-orange-light' : 'bg-ono-green-light'}`}>
               <p className="text-sm font-medium">
                 {uploadResults.uploaded > 0 && <span className="text-ono-green-dark">{'\u2713'} {uploadResults.uploaded} קבצים הועלו בהצלחה</span>}
