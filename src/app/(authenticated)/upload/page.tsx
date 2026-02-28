@@ -39,8 +39,10 @@ interface FileEntry {
   name: string;
   size: number;
   type: string;
+  error?: string;
 }
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const NEWSLETTER_EXTS = new Set(['indd', 'ai', 'eps', 'pub', 'html', 'htm', 'pptx', 'ppt', 'docx', 'doc', 'idml']);
 
 function FileTypeIcon({ type, filename }: { type: string; filename?: string }) {
@@ -125,9 +127,14 @@ export default function UploadPage() {
   };
 
   const addFiles = (newFiles: File[]) => {
-    const entries: FileEntry[] = newFiles.map(f => ({
-      file: f, name: f.name, size: f.size, type: f.type,
-    }));
+    const entries: FileEntry[] = newFiles.map(f => {
+      const isZip = f.type.includes('zip') || f.name.toLowerCase().endsWith('.zip');
+      const tooLarge = !isZip && f.size > MAX_FILE_SIZE;
+      return {
+        file: f, name: f.name, size: f.size, type: f.type,
+        error: tooLarge ? `הקובץ גדול מדי (${(f.size / (1024 * 1024)).toFixed(1)} MB). הגודל המקסימלי הוא 50MB` : undefined,
+      };
+    });
     setFiles(prev => [...prev, ...entries]);
   };
 
@@ -141,72 +148,209 @@ export default function UploadPage() {
     setUploadResults(null);
 
     const progress: Record<string, 'pending' | 'uploading' | 'done' | 'error'> = {};
-    files.forEach((_, i) => { progress[i] = 'uploading'; });
+    files.forEach((_, i) => { progress[i] = 'pending'; });
+
+    // Split files: oversized already have errors, then ZIPs vs direct
+    const validFiles = files.filter(f => !f.error);
+    const zipFiles = validFiles.filter(f => f.type.includes('zip') || f.name.toLowerCase().endsWith('.zip'));
+    const directFiles = validFiles.filter(f => !f.type.includes('zip') && !f.name.toLowerCase().endsWith('.zip'));
+
+    // Mark oversized as error immediately
+    files.forEach((f, i) => { if (f.error) progress[i] = 'error'; });
     setUploadProgress({ ...progress });
 
-    const formData = new FormData();
-    files.forEach(f => formData.append('files', f.file));
+    let totalUploaded = 0;
+    let totalErrors = files.filter(f => f.error).length;
+    const allErrorDetails: { file: string; error: string }[] = files
+      .filter(f => f.error)
+      .map(f => ({ file: f.name, error: f.error! }));
 
-    formData.append('workspace_id', selectedWorkspace);
-    formData.append('slug_id', selectedSlug);
-    formData.append('asset_type', assetType);
-    formData.append('upload_date', uploadDate);
-    if (selectedInitiative) formData.append('initiative_id', selectedInitiative);
-    if (domainContext) formData.append('domain_context', domainContext);
-    if (selectedPlatforms.length > 0) formData.append('platforms', JSON.stringify(selectedPlatforms));
-    if (selectedTags.length > 0) formData.append('tags', selectedTags.join(','));
+    // --- Phase A: Upload ZIPs through existing route ---
+    if (zipFiles.length > 0) {
+      const zipIndices = files.map((f, i) => zipFiles.includes(f) ? i : -1).filter(i => i >= 0);
+      zipIndices.forEach(i => { progress[i] = 'uploading'; });
+      setUploadProgress({ ...progress });
 
-    try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const formData = new FormData();
+      zipFiles.forEach(f => formData.append('files', f.file));
+      formData.append('workspace_id', selectedWorkspace);
+      formData.append('slug_id', selectedSlug);
+      formData.append('asset_type', assetType);
+      formData.append('upload_date', uploadDate);
+      if (selectedInitiative) formData.append('initiative_id', selectedInitiative);
+      if (domainContext) formData.append('domain_context', domainContext);
+      if (selectedPlatforms.length > 0) formData.append('platforms', JSON.stringify(selectedPlatforms));
+      if (selectedTags.length > 0) formData.append('tags', selectedTags.join(','));
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        showError(
-          'שגיאה בהעלאה',
-          errData.error || 'השרת החזיר שגיאה.',
-          res.status === 401 ? 'התחבר מחדש ונסה שוב.' : 'בדוק שכל שדות החובה מלאים ונסה שוב.',
-        );
-        await logClientError('upload', errData.error || `HTTP ${res.status}`, `${files.length} files`);
-        files.forEach((_, i) => { progress[i] = 'error'; });
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (res.ok) {
+          const result = await res.json();
+          totalUploaded += result.uploaded?.length || 0;
+          if (result.errors?.length) {
+            totalErrors += result.errors.length;
+            allErrorDetails.push(...result.errors);
+          }
+          zipIndices.forEach(i => {
+            progress[i] = result.errors?.find((e: { file: string }) => e.file === files[i].name) ? 'error' : 'done';
+          });
+        } else {
+          zipIndices.forEach(i => { progress[i] = 'error'; });
+          totalErrors += zipFiles.length;
+        }
+      } catch {
+        zipIndices.forEach(i => { progress[i] = 'error'; });
+        totalErrors += zipFiles.length;
+      }
+      setUploadProgress({ ...progress });
+    }
+
+    // --- Phase B: Direct upload for non-ZIP files ---
+    if (directFiles.length > 0) {
+      const directIndices = files.map((f, i) => directFiles.includes(f) ? i : -1).filter(i => i >= 0);
+      directIndices.forEach(i => { progress[i] = 'uploading'; });
+      setUploadProgress({ ...progress });
+
+      try {
+        // B1: Prepare — get signed URLs
+        const prepareRes = await fetch('/api/upload/prepare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            files: directFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
+            slug_id: selectedSlug,
+            workspace_id: selectedWorkspace,
+            initiative_id: selectedInitiative || undefined,
+            upload_date: uploadDate,
+            asset_type: assetType,
+          }),
+        });
+
+        if (!prepareRes.ok) {
+          directIndices.forEach(i => { progress[i] = 'error'; });
+          totalErrors += directFiles.length;
+          setUploadProgress({ ...progress });
+        } else {
+          const prepareData = await prepareRes.json();
+
+          // Handle files rejected by prepare
+          if (prepareData.errors?.length) {
+            totalErrors += prepareData.errors.length;
+            allErrorDetails.push(...prepareData.errors);
+            for (const err of prepareData.errors) {
+              const idx = files.findIndex(f => f.name === err.file);
+              if (idx >= 0) progress[idx] = 'error';
+            }
+            setUploadProgress({ ...progress });
+          }
+
+          // B2: Upload each file directly to Supabase via signed URL
+          const successfulUploads: typeof prepareData.files = [];
+          for (const prepared of prepareData.files || []) {
+            const fileEntry = directFiles.find(f => f.name === prepared.originalName);
+            const fileIdx = files.findIndex(f => f.name === prepared.originalName);
+            if (!fileEntry || fileIdx < 0) continue;
+
+            try {
+              const uploadRes = await fetch(prepared.signedUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': fileEntry.type || 'application/octet-stream' },
+                body: fileEntry.file,
+              });
+
+              if (uploadRes.ok) {
+                progress[fileIdx] = 'done';
+                successfulUploads.push(prepared);
+              } else {
+                progress[fileIdx] = 'error';
+                totalErrors++;
+                allErrorDetails.push({ file: prepared.originalName, error: `שגיאה בהעלאה ישירה (${uploadRes.status})` });
+              }
+            } catch {
+              progress[fileIdx] = 'error';
+              totalErrors++;
+              allErrorDetails.push({ file: prepared.originalName, error: 'שגיאת רשת בהעלאה' });
+            }
+            setUploadProgress({ ...progress });
+          }
+
+          // B3: Complete — create DB records for successful uploads
+          if (successfulUploads.length > 0) {
+            try {
+              const completeRes = await fetch('/api/upload/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  files: successfulUploads.map((p: { originalName: string; storagePath: string; fileType: string }) => ({
+                    originalName: p.originalName,
+                    storagePath: p.storagePath,
+                    size: directFiles.find(f => f.name === p.originalName)?.size || 0,
+                    type: directFiles.find(f => f.name === p.originalName)?.type || '',
+                    fileType: p.fileType,
+                  })),
+                  slug_id: selectedSlug,
+                  workspace_id: selectedWorkspace,
+                  initiative_id: selectedInitiative || undefined,
+                  domain_context: domainContext || undefined,
+                  platforms: selectedPlatforms.length > 0 ? selectedPlatforms : undefined,
+                  tags: selectedTags.length > 0 ? selectedTags : undefined,
+                  upload_date: uploadDate,
+                  asset_type: assetType,
+                }),
+              });
+
+              if (completeRes.ok) {
+                const completeData = await completeRes.json();
+                totalUploaded += completeData.uploaded?.length || 0;
+                if (completeData.errors?.length) {
+                  totalErrors += completeData.errors.length;
+                  allErrorDetails.push(...completeData.errors);
+                  for (const err of completeData.errors) {
+                    const idx = files.findIndex(f => f.name === err.file);
+                    if (idx >= 0) progress[idx] = 'error';
+                  }
+                }
+              } else {
+                for (const p of successfulUploads) {
+                  const idx = files.findIndex(f => f.name === (p as { originalName: string }).originalName);
+                  if (idx >= 0) progress[idx] = 'error';
+                  totalErrors++;
+                }
+              }
+            } catch {
+              for (const p of successfulUploads) {
+                const idx = files.findIndex(f => f.name === (p as { originalName: string }).originalName);
+                if (idx >= 0) progress[idx] = 'error';
+                totalErrors++;
+              }
+            }
+            setUploadProgress({ ...progress });
+          }
+        }
+      } catch (err) {
+        directIndices.forEach(i => { progress[i] = 'error'; });
+        totalErrors += directFiles.length;
         setUploadProgress({ ...progress });
-        setUploading(false);
-        return;
+        await logClientError('upload-direct', err instanceof Error ? err.message : 'Network error');
       }
+    }
 
-      const result = await res.json();
-
-      files.forEach((f, i) => {
-        progress[i] = result.errors?.find((e: { file: string }) => e.file === f.name) ? 'error' : 'done';
-      });
-      setUploadProgress({ ...progress });
-      setUploadResults({
-        uploaded: result.uploaded?.length || 0,
-        errors: result.errors?.length || 0,
-      });
-
-      // Show detailed feedback
-      const uploadedCount = result.uploaded?.length || 0;
-      const errorCount = result.errors?.length || 0;
-      if (uploadedCount > 0 && errorCount === 0) {
-        showSuccess(`${uploadedCount} קבצים הועלו בהצלחה`);
-      } else if (uploadedCount > 0 && errorCount > 0) {
-        showWarning(
-          `${uploadedCount} קבצים הועלו, ${errorCount} נכשלו`,
-          result.errors.map((e: { file: string; error: string }) => `${e.file}: ${e.error}`).join(' | '),
-          'בדוק את הקבצים שנכשלו ונסה להעלות אותם שוב.',
-        );
-      } else if (errorCount > 0) {
-        showError(
-          'כל הקבצים נכשלו בהעלאה',
-          result.errors.map((e: { file: string; error: string }) => `${e.file}: ${e.error}`).join(' | '),
-          'בדוק את סוג הקבצים ואת הגודל ונסה שוב.',
-        );
-      }
-    } catch (err) {
-      files.forEach((_, i) => { progress[i] = 'error'; });
-      setUploadProgress({ ...progress });
-      showError('שגיאת תקשורת', 'לא ניתן היה להתחבר לשרת.', 'בדוק את חיבור האינטרנט ונסה שוב.');
-      await logClientError('upload-network', err instanceof Error ? err.message : 'Network error');
+    // Show results
+    setUploadResults({ uploaded: totalUploaded, errors: totalErrors });
+    if (totalUploaded > 0 && totalErrors === 0) {
+      showSuccess(`${totalUploaded} קבצים הועלו בהצלחה`);
+    } else if (totalUploaded > 0 && totalErrors > 0) {
+      showWarning(
+        `${totalUploaded} קבצים הועלו, ${totalErrors} נכשלו`,
+        allErrorDetails.map(e => `${e.file}: ${e.error}`).join(' | '),
+        'בדוק את הקבצים שנכשלו ונסה להעלות אותם שוב.',
+      );
+    } else if (totalErrors > 0) {
+      showError(
+        'כל הקבצים נכשלו בהעלאה',
+        allErrorDetails.map(e => `${e.file}: ${e.error}`).join(' | '),
+        'בדוק את סוג הקבצים ואת הגודל ונסה שוב.',
+      );
     }
 
     setUploading(false);
@@ -289,7 +433,7 @@ export default function UploadPage() {
       >
         <UploadIcon className="w-12 h-12 text-ono-green mx-auto mb-4" />
         <p className="text-ono-gray-dark font-medium mb-1">גררו קבצים לכאן או לחצו לבחירה</p>
-        <p className="text-sm text-ono-gray">תמונות, וידאו, PDF, ידיעונים (InDesign, AI, HTML, PPTX, DOCX), ZIP — עד 2GB</p>
+        <p className="text-sm text-ono-gray">תמונות, וידאו, PDF, ידיעונים (InDesign, AI, HTML, PPTX, DOCX), ZIP — עד 50MB</p>
         <p className="text-xs text-ono-orange mt-2">קבצי ZIP ייפתחו אוטומטית — כל קובץ מוכר בתוכם יועלה בנפרד</p>
         <input
           id="file-input"
@@ -317,12 +461,13 @@ export default function UploadPage() {
           </div>
           <div className="divide-y divide-[#E8E8E8] max-h-60 overflow-auto">
             {files.map((f, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-2.5">
+              <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${f.error ? 'bg-red-50' : ''}`}>
                 <div className="flex items-center gap-3">
                   <FileTypeIcon type={f.type} filename={f.name} />
                   <div>
                     <p className="text-sm text-ono-gray-dark">{f.name}</p>
                     <p className="text-xs text-ono-gray">{computeFileSizeLabel(f.size)}</p>
+                    {f.error && <p className="text-xs text-red-600 mt-0.5">{f.error}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

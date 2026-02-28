@@ -9,6 +9,12 @@
     "src/app/api/upload/route.ts": {
       "maxDuration": 60
     },
+    "src/app/api/upload/prepare/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/upload/complete/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/export/route.ts": {
       "maxDuration": 60
     }

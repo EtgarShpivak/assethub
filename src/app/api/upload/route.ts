@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Allow up to 2 minutes for large uploads
 export const fetchCache = 'force-no-store';
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (Supabase storage limit)
 const ALLOWED_MIMES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
   'image/bmp', 'image/tiff', 'image/heic', 'image/heif', 'image/avif',
@@ -92,6 +92,58 @@ interface FileToProcess {
   size: number;
 }
 
+const MAX_ZIP_DEPTH = 3;
+
+async function extractZipContents(
+  buffer: Buffer,
+  zipName: string,
+  depth: number = 0
+): Promise<{ files: FileToProcess[]; errors: { file: string; error: string }[] }> {
+  const files: FileToProcess[] = [];
+  const errors: { file: string; error: string }[] = [];
+
+  if (depth > MAX_ZIP_DEPTH) {
+    errors.push({ file: zipName, error: 'קובץ ZIP מקונן עמוק מדי (מקסימום 3 רמות)' });
+    return { files, errors };
+  }
+
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const entries = Object.entries(zip.files);
+
+    for (const [path, zipEntry] of entries) {
+      if (zipEntry.dir) continue;
+      const name = path.split('/').pop() || '';
+      if (name.startsWith('.') || name.startsWith('__')) continue;
+
+      const ext = name.split('.').pop()?.toLowerCase() || '';
+
+      try {
+        const entryBuffer = Buffer.from(await zipEntry.async('arraybuffer'));
+
+        // Recursively extract nested ZIPs
+        if (ext === 'zip') {
+          const nested = await extractZipContents(entryBuffer, `${zipName}/${name}`, depth + 1);
+          files.push(...nested.files);
+          errors.push(...nested.errors);
+          continue;
+        }
+
+        if (!EXTRACTABLE_EXTENSIONS.has(ext)) continue;
+
+        const mime = guessMimeType(name);
+        files.push({ name, buffer: entryBuffer, mimeType: mime, size: entryBuffer.length });
+      } catch {
+        errors.push({ file: `${zipName}/${name}`, error: 'שגיאה בחילוץ מה-ZIP' });
+      }
+    }
+  } catch {
+    errors.push({ file: zipName, error: 'שגיאה בפתיחת קובץ ZIP' });
+  }
+
+  return { files, errors };
+}
+
 export async function POST(request: NextRequest) {
   const user = await getAuthUser();
   if (!user) {
@@ -152,38 +204,12 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Check if it's a ZIP — extract its contents
+    // Check if it's a ZIP — extract its contents (including nested ZIPs)
     if (file.type === 'application/zip' || file.type === 'application/x-zip-compressed' ||
         file.name.toLowerCase().endsWith('.zip')) {
-      try {
-        const zip = await JSZip.loadAsync(buffer);
-        const entries = Object.entries(zip.files);
-
-        for (const [path, zipEntry] of entries) {
-          if (zipEntry.dir) continue;
-          // Skip hidden/system files
-          const name = path.split('/').pop() || '';
-          if (name.startsWith('.') || name.startsWith('__')) continue;
-
-          const ext = name.split('.').pop()?.toLowerCase() || '';
-          if (!EXTRACTABLE_EXTENSIONS.has(ext)) continue;
-
-          try {
-            const entryBuffer = Buffer.from(await zipEntry.async('arraybuffer'));
-            const mime = guessMimeType(name);
-            filesToProcess.push({
-              name,
-              buffer: entryBuffer,
-              mimeType: mime,
-              size: entryBuffer.length,
-            });
-          } catch {
-            errors.push({ file: `${file.name}/${name}`, error: 'שגיאה בחילוץ מה-ZIP' });
-          }
-        }
-      } catch {
-        errors.push({ file: file.name, error: 'שגיאה בפתיחת קובץ ZIP' });
-      }
+      const result = await extractZipContents(buffer, file.name);
+      filesToProcess.push(...result.files);
+      errors.push(...result.errors);
     } else if (ALLOWED_MIMES.has(file.type) || isAllowedByExtension(file.name)) {
       // Use proper mime type based on extension if browser sent generic type
       const mimeType = (file.type === 'application/octet-stream' || !file.type)
