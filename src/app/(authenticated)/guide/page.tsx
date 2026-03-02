@@ -117,10 +117,10 @@ export default function UserGuidePage() {
             </ul>
           </div>
         </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
-          <Shield className="w-4 h-4 text-yellow-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-yellow-800">
-            <strong>זיהוי כפילויות:</strong> המערכת מזהה קבצים כפולים אוטומטית. אם אותו קובץ כבר קיים, תקבלו הודעה ולא תהיה אפשרות להעלות שוב.
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+          <Shield className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-blue-800">
+            <strong>שמות קבצים:</strong> המערכת יוצרת שם משמעותי לכל קובץ: slug-campaign-date-type-dimensions-nn.ext. המספר הרץ מבטיח ייחודיות — אין חסימת כפילויות.
           </p>
         </div>
       </section>
@@ -266,7 +266,7 @@ export default function UserGuidePage() {
         <div className="flex items-start gap-3">
           <Clock className="w-5 h-5 text-ono-green mt-0.5 shrink-0" />
           <p className="text-sm text-ono-gray-dark leading-relaxed">
-            לחומרים עם רישיון מוגבל או תוקף, ניתן להגדיר <strong>תאריך תפוגה</strong> ו<strong>הערות רישיון</strong>. חומרים שפג תוקפם מסומנים בתג אדום בחלונית הפרטים.
+            לחומרים עם רישיון מוגבל או תוקף, ניתן להגדיר <strong>תאריך תפוגה</strong> ו<strong>הערות רישיון</strong>. חומרים שפג תוקפם <strong>נמחקים אוטומטית</strong> פעם ביום (כולל הקבצים מהאחסון). ניתן לסנן חומרים בספרייה לפי סטטוס תפוגה.
           </p>
         </div>
       </section>
