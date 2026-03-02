@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  logActivity(request, {
+  await logActivity(request, {
     action: 'create',
     entityType: 'collection',
     entityId: collection.id,

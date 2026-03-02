@@ -222,7 +222,7 @@ export async function GET(request: NextRequest) {
     search || tag || unclassified || expiry;
 
   if (hasActiveFilters) {
-    logActivity(request, {
+    await logActivity(request, {
       action: 'search',
       entityType: 'search',
       entityName: search || 'חיפוש מסננים',

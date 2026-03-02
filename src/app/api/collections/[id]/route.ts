@@ -94,7 +94,7 @@ export async function PATCH(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  logActivity(request, {
+  await logActivity(request, {
     action: 'edit',
     entityType: 'collection',
     entityId: params.id,
@@ -137,7 +137,7 @@ export async function DELETE(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  logActivity(request, {
+  await logActivity(request, {
     action: 'delete',
     entityType: 'collection',
     entityId: params.id,

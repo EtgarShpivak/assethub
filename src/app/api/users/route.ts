@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the invite/re-invite
-    logActivity(request, {
+    await logActivity(request, {
       action: 'create',
       entityType: 'user',
       entityId: existingUser.id,

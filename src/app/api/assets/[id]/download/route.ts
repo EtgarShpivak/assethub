@@ -53,9 +53,9 @@ export async function GET(
       return NextResponse.json({ error: 'שגיאה בהורדת הקובץ' }, { status: 500 });
     }
 
-    // Log download activity via centralized logger (non-blocking)
+    // Log download activity (must await on serverless)
     const downloadFilename = asset.stored_filename || asset.original_filename;
-    logActivity(request, {
+    await logActivity(request, {
       action: 'download',
       entityType: 'asset',
       entityId: params.id,

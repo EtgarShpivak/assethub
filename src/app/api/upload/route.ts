@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
       } else {
         results.push(asset);
         // Log successful upload
-        logActivity(request, {
+        await logActivity(request, {
           action: 'upload',
           entityType: 'asset',
           entityId: asset.id,

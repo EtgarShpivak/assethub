@@ -79,7 +79,7 @@ export async function PUT(request: NextRequest) {
     if (!updateError) updated++;
   }
 
-  logActivity(request, {
+  await logActivity(request, {
     action: 'edit',
     entityType: 'tag',
     entityName: `${oldName} → ${newName}`,
@@ -125,7 +125,7 @@ export async function DELETE(request: NextRequest) {
     if (!updateError) updated++;
   }
 
-  logActivity(request, {
+  await logActivity(request, {
     action: 'delete',
     entityType: 'tag',
     entityName: name,

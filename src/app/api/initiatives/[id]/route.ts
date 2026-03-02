@@ -69,7 +69,7 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  logActivity(request, {
+  await logActivity(request, {
     action: 'edit',
     entityType: 'initiative',
     entityId: params.id,
@@ -108,7 +108,7 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  logActivity(request, {
+  await logActivity(request, {
     action: 'archive',
     entityType: 'initiative',
     entityId: params.id,
