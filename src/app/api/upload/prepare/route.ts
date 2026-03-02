@@ -123,24 +123,25 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
 
     // Build smart filename (dimensions resolved in complete phase for images)
-    const baseName = [
+    const namePrefix = [
       slug.slug,
       initiative?.short_code || 'standalone',
       dateStr,
       detectedType,
-      'nodim',
     ].join('-');
 
     // Count existing files for running number
+    // Use the prefix WITHOUT 'nodim' so we find already-completed files too
+    // (completed images get 'nodim' replaced with actual dimensions)
     const { count: existingCount } = await supabase
       .from('assets')
       .select('*', { count: 'exact', head: true })
       .eq('slug_id', slug_id)
       .eq('file_type', detectedType)
-      .like('stored_filename', `${baseName}%`);
+      .like('stored_filename', `${namePrefix}-%`);
 
     const runNumber = String((existingCount || 0) + 1).padStart(2, '0');
-    const storedFilename = `${baseName}-${runNumber}.${ext}`;
+    const storedFilename = `${namePrefix}-nodim-${runNumber}.${ext}`;
     const fullPath = `${storagePath}/${storedFilename}`;
 
     // Create signed upload URL

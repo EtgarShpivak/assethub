@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -33,7 +34,7 @@ export async function GET(
 
   const { data: asset, error } = await supabase
     .from('assets')
-    .select('drive_file_id, original_filename, mime_type')
+    .select('drive_file_id, original_filename, stored_filename, mime_type, file_type, file_size_label, slug_id, workspace_id')
     .eq('id', params.id)
     .single();
 
@@ -52,22 +53,29 @@ export async function GET(
       return NextResponse.json({ error: 'שגיאה בהורדת הקובץ' }, { status: 500 });
     }
 
-    // Log download activity (non-blocking)
-    if (user) {
-      supabase.from('activity_log').insert({
-        user_id: user.id,
-        action: 'download',
-        entity_type: 'asset',
-        entity_id: params.id,
-        entity_name: asset.original_filename,
-      }).then(() => {});
-    }
+    // Log download activity via centralized logger (non-blocking)
+    const downloadFilename = asset.stored_filename || asset.original_filename;
+    logActivity(request, {
+      action: 'download',
+      entityType: 'asset',
+      entityId: params.id,
+      entityName: downloadFilename,
+      userId: user?.id || null,
+      workspaceId: asset.workspace_id || null,
+      metadata: {
+        file_type: asset.file_type,
+        file_size: asset.file_size_label,
+        original_filename: asset.original_filename,
+        via_share: !user && !!shareToken,
+      },
+    });
 
     // Convert Blob to ArrayBuffer for Vercel compatibility
     const arrayBuffer = await data.arrayBuffer();
 
+    // Serve with stored_filename (convention name), fallback to original
     const headers = new Headers();
-    headers.set('Content-Disposition', `attachment; filename="${encodeURIComponent(asset.original_filename)}"`);
+    headers.set('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadFilename)}"`);
     if (asset.mime_type) headers.set('Content-Type', asset.mime_type);
     headers.set('Content-Length', arrayBuffer.byteLength.toString());
     // Security: prevent content sniffing

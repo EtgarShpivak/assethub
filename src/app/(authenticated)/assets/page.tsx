@@ -672,13 +672,37 @@ export default function AssetLibraryPage() {
           </div>
         </div>
 
-        {/* Search bar */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        {/* Search bar + quick filters */}
+        <div className="flex gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray" />
             <Input className="pr-10" placeholder="חיפוש לפי שם קובץ, הערות או תגיות..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
-          <div className="relative w-48">
+          {/* Slug quick filter */}
+          <select
+            value={filterSlugs.length === 1 ? filterSlugs[0] : ''}
+            onChange={(e) => { setFilterSlugs(e.target.value ? [e.target.value] : []); setPage(1); }}
+            className="border border-[#E8E8E8] rounded-md p-2 text-sm h-10 appearance-none min-w-[140px]"
+          >
+            <option value="">כל הסלאגים</option>
+            {slugs.filter(s => !s.is_archived).map(s => (
+              <option key={s.id} value={s.id}>{s.display_name}</option>
+            ))}
+          </select>
+          {/* Campaign quick filter */}
+          <select
+            value={filterInitiatives.length === 1 ? filterInitiatives[0] : ''}
+            onChange={(e) => { setFilterInitiatives(e.target.value ? [e.target.value] : []); setPage(1); }}
+            className="border border-[#E8E8E8] rounded-md p-2 text-sm h-10 appearance-none min-w-[140px]"
+          >
+            <option value="">כל הקמפיינים</option>
+            <option value="__no_initiative__">ללא קמפיין</option>
+            {initiatives.map(i => (
+              <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>
+            ))}
+          </select>
+          {/* Tag quick filter */}
+          <div className="relative min-w-[140px]">
             <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
             <select
               value={filterTag}
@@ -780,9 +804,12 @@ export default function AssetLibraryPage() {
                   </div>
                 </div>
                 <div className="p-3" onClick={() => setDetailAsset(asset)}>
-                  <p className="text-xs font-medium text-ono-gray-dark truncate mb-1">
-                    {(asset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || asset.original_filename}
-                    {asset.domain_context && ` · ${DOMAIN_CONTEXTS.find(d => d.value === asset.domain_context)?.label || ''}`}
+                  <p className="text-xs font-medium text-ono-gray-dark truncate mb-0.5">
+                    {asset.stored_filename || asset.original_filename}
+                  </p>
+                  <p className="text-[10px] text-ono-gray truncate mb-1">
+                    {asset.stored_filename && asset.original_filename !== asset.stored_filename ? asset.original_filename : ''}
+                    {asset.domain_context ? `${asset.stored_filename && asset.original_filename !== asset.stored_filename ? ' · ' : ''}${DOMAIN_CONTEXTS.find(d => d.value === asset.domain_context)?.label || ''}` : ''}
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {asset.dimensions_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.dimensions_label}</Badge>}

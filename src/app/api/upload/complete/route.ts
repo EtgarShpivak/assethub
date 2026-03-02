@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
           drive_file_id: finalPath,
           drive_view_url: urlData.publicUrl,
           upload_date: uploadDateISO,
-          uploaded_by: null,
+          uploaded_by: user.id,
           tags: tags || null,
           file_hash: fileHash,
           expires_at: expires_at || null,

@@ -149,6 +149,73 @@ function ActionIcon({ action }: { action: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: Content description — shows meaningful inline details
+// ---------------------------------------------------------------------------
+
+function getContentDescription(entry: ActivityLogEntry): string | null {
+  const m = entry.metadata || {};
+  const parts: string[] = [];
+
+  switch (entry.action) {
+    case 'upload': {
+      if (m.file_type) parts.push(String(m.file_type));
+      if (m.file_size_bytes) {
+        const bytes = Number(m.file_size_bytes);
+        if (bytes > 1024 * 1024) parts.push(`${(bytes / (1024 * 1024)).toFixed(1)} MB`);
+        else if (bytes > 1024) parts.push(`${(bytes / 1024).toFixed(0)} KB`);
+      }
+      if (m.upload_method) parts.push(String(m.upload_method) === 'direct' ? 'העלאה ישירה' : String(m.upload_method));
+      break;
+    }
+    case 'download': {
+      if (m.file_type) parts.push(String(m.file_type));
+      if (m.file_size) parts.push(String(m.file_size));
+      if (m.original_filename && entry.entity_name !== m.original_filename) {
+        parts.push(`מקור: ${String(m.original_filename)}`);
+      }
+      if (m.via_share) parts.push('דרך קישור שיתוף');
+      break;
+    }
+    case 'search': {
+      if (m.result_count !== undefined) parts.push(`${m.result_count} תוצאות`);
+      const filters = m.filters as Record<string, unknown> | undefined;
+      if (filters) {
+        const activeFilters: string[] = [];
+        if (filters.slug_id) activeFilters.push('סלאג');
+        if (filters.initiative_id) activeFilters.push('קמפיין');
+        if (filters.file_type) activeFilters.push('סוג');
+        if (filters.platform) activeFilters.push('פלטפורמה');
+        if (filters.tag) activeFilters.push('תגית');
+        if (filters.search) activeFilters.push(`"${filters.search}"`);
+        if (activeFilters.length > 0) parts.push(`סינון: ${activeFilters.join(', ')}`);
+      }
+      break;
+    }
+    case 'error': {
+      if (m.context) parts.push(String(m.context));
+      break;
+    }
+    case 'edit': {
+      if (m.changed_fields) parts.push(`שדות: ${String(m.changed_fields)}`);
+      break;
+    }
+    case 'share': {
+      if (m.expires_in_days) parts.push(`${m.expires_in_days} ימים`);
+      if (m.asset_count) parts.push(`${m.asset_count} חומרים`);
+      break;
+    }
+    case 'auto_delete_expired': {
+      if (m.deleted_count) parts.push(`${m.deleted_count} חומרים נמחקו`);
+      break;
+    }
+    default:
+      break;
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: Time formatting
 // ---------------------------------------------------------------------------
 
@@ -497,6 +564,7 @@ export default function UnifiedActivityLogPage() {
               const loginMethod: string | null = entry.metadata?.login_method
                 ? String(entry.metadata.login_method)
                 : null;
+              const contentDesc = getContentDescription(entry);
 
               return (
                 <div key={entry.id}>
@@ -557,13 +625,20 @@ export default function UnifiedActivityLogPage() {
                       </Badge>
                     </div>
 
-                    {/* Entity name */}
-                    <div className="text-sm text-ono-gray-dark truncate">
-                      {entry.entity_name || '-'}
+                    {/* Entity name + content description */}
+                    <div className="min-w-0">
+                      <div className="text-sm text-ono-gray-dark truncate">
+                        {entry.entity_name || '-'}
+                      </div>
+                      {contentDesc && (
+                        <div className="text-[11px] text-ono-gray mt-0.5 truncate">
+                          {contentDesc}
+                        </div>
+                      )}
                       {errorMessage && (
-                        <span className="block text-xs text-red-500 mt-0.5 truncate">
+                        <div className="text-xs text-red-500 mt-0.5 truncate">
                           {errorMessage}
-                        </span>
+                        </div>
                       )}
                     </div>
 
