@@ -186,6 +186,20 @@ export async function GET(request: NextRequest) {
     query = query.or('platforms.is.null,platforms.eq.{}');
   }
 
+  // Expiry filter
+  const expiry = searchParams.get('expiry');
+  if (expiry === 'valid') {
+    query = query.or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
+  } else if (expiry === 'expired') {
+    query = query.not('expires_at', 'is', null).lt('expires_at', new Date().toISOString());
+  } else if (expiry === 'expiring_soon') {
+    const in30Days = new Date();
+    in30Days.setDate(in30Days.getDate() + 30);
+    query = query.not('expires_at', 'is', null)
+      .gte('expires_at', new Date().toISOString())
+      .lte('expires_at', in30Days.toISOString());
+  }
+
   // Pagination
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '48');

@@ -142,6 +142,7 @@ export default function AssetLibraryPage() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterTag, setFilterTag] = useState('');
+  const [filterExpiry, setFilterExpiry] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeDatePreset, setActiveDatePreset] = useState('');
   const [page, setPage] = useState(1);
@@ -230,6 +231,7 @@ export default function AssetLibraryPage() {
     if (filterDateFrom) params.set('date_from', filterDateFrom);
     if (filterDateTo) params.set('date_to', filterDateTo);
     if (filterTag) params.set('tag', filterTag);
+    if (filterExpiry) params.set('expiry', filterExpiry);
     if (searchParams.get('unclassified')) params.set('unclassified', 'true');
     params.set('page', page.toString());
     params.set('sort_by', sortBy);
@@ -247,7 +249,7 @@ export default function AssetLibraryPage() {
     setLoading(false);
   }, [searchQuery, filterSlugs, filterInitiatives, filterFileTypes, filterPlatforms,
       filterAspectRatios, filterDomainContexts, filterAssetTypes, filterDimensions,
-      filterDateFrom, filterDateTo, filterTag, page, sortBy, sortDir, searchParams, showToast, _showError]);
+      filterDateFrom, filterDateTo, filterTag, filterExpiry, page, sortBy, sortDir, searchParams, showToast, _showError]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -293,14 +295,14 @@ export default function AssetLibraryPage() {
   const hasActiveFilters = filterSlugs.length > 0 || filterInitiatives.length > 0 ||
     filterFileTypes.length > 0 || filterPlatforms.length > 0 || filterAspectRatios.length > 0 ||
     filterDomainContexts.length > 0 || filterAssetTypes.length > 0 ||
-    filterDimensions || filterDateFrom || filterDateTo || filterTag || searchQuery;
+    filterDimensions || filterDateFrom || filterDateTo || filterTag || filterExpiry || searchQuery;
 
   const clearFilters = () => {
     setSearchQuery(''); setFilterSlugs([]); setFilterInitiatives([]);
     setFilterFileTypes([]); setFilterPlatforms([]); setFilterAspectRatios([]);
     setFilterDomainContexts([]); setFilterAssetTypes([]);
     setFilterDimensions(''); setFilterDateFrom(''); setFilterDateTo('');
-    setFilterTag(''); setActiveDatePreset(''); setPage(1);
+    setFilterTag(''); setFilterExpiry(''); setActiveDatePreset(''); setPage(1);
   };
 
   const getCurrentFilters = () => ({
@@ -316,6 +318,7 @@ export default function AssetLibraryPage() {
     dateFrom: filterDateFrom || undefined,
     dateTo: filterDateTo || undefined,
     tag: filterTag || undefined,
+    expiry: filterExpiry || undefined,
   });
 
   const applySavedSearch = (search: SavedSearch) => {
@@ -332,6 +335,7 @@ export default function AssetLibraryPage() {
     setFilterDateFrom((f.dateFrom as string) || '');
     setFilterDateTo((f.dateTo as string) || '');
     setFilterTag((f.tag as string) || '');
+    setFilterExpiry((f.expiry as string) || '');
     setActiveDatePreset('');
     setPage(1);
   };
@@ -784,6 +788,12 @@ export default function AssetLibraryPage() {
                     {asset.dimensions_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.dimensions_label}</Badge>}
                     {asset.file_size_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.file_size_label}</Badge>}
                     {asset.platforms?.map(p => <PlatformBadge key={p} platform={p} />)}
+                    {asset.expires_at && (
+                      <Badge variant="outline" className={`text-[10px] ${new Date(asset.expires_at) < new Date() ? 'border-red-300 text-red-600' : 'border-orange-300 text-orange-600'}`}>
+                        <Clock className="w-3 h-3 ml-0.5" />
+                        {new Date(asset.expires_at) < new Date() ? 'פג תוקף' : `עד ${new Date(asset.expires_at).toLocaleDateString('he-IL')}`}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-[10px] text-ono-gray mt-1">{new Date(asset.upload_date).toLocaleDateString('he-IL')}</p>
                 </div>
@@ -817,7 +827,12 @@ export default function AssetLibraryPage() {
                     <td className="p-3 text-ono-gray font-mono text-xs">{asset.aspect_ratio || '—'}</td>
                     <td className="p-3 text-ono-gray">{asset.file_size_label || '—'}</td>
                     <td className="p-3 text-ono-gray text-xs">{ASSET_TYPES.find(t => t.value === asset.asset_type)?.label || '—'}</td>
-                    <td className="p-3"><div className="flex flex-wrap gap-1">{asset.platforms?.map(p => <PlatformBadge key={p} platform={p} />) || <span className="text-ono-gray text-xs">—</span>}</div></td>
+                    <td className="p-3"><div className="flex flex-wrap gap-1">{asset.platforms?.map(p => <PlatformBadge key={p} platform={p} />) || <span className="text-ono-gray text-xs">—</span>}{asset.expires_at && (
+                      <Badge variant="outline" className={`text-[10px] ${new Date(asset.expires_at) < new Date() ? 'border-red-300 text-red-600' : 'border-orange-300 text-orange-600'}`}>
+                        <Clock className="w-3 h-3 ml-0.5" />
+                        {new Date(asset.expires_at) < new Date() ? 'פג תוקף' : `עד ${new Date(asset.expires_at).toLocaleDateString('he-IL')}`}
+                      </Badge>
+                    )}</div></td>
                     <td className="p-3 text-ono-gray text-xs">{new Date(asset.upload_date).toLocaleDateString('he-IL')}</td>
                     <td className="p-3 text-ono-gray text-xs">{(asset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || '—'}</td>
                   </tr>
@@ -896,6 +911,16 @@ export default function AssetLibraryPage() {
           </div>
 
           <MultiCheckboxFilter label="סוג תוכן" options={DOMAIN_CONTEXTS} selected={filterDomainContexts} onChange={v => { setFilterDomainContexts(v); setPage(1); }} />
+
+          <div>
+            <Label className="text-xs mb-1.5 block">תוקף</Label>
+            <select value={filterExpiry} onChange={e => setFilterExpiry(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-1.5 text-xs">
+              <option value="">הכל</option>
+              <option value="valid">בתוקף</option>
+              <option value="expired">פג תוקף</option>
+              <option value="expiring_soon">פוקע ב-30 יום</option>
+            </select>
+          </div>
         </div>
       </aside>
 

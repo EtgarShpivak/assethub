@@ -164,6 +164,7 @@ export async function POST(request: NextRequest) {
   const assetType = (formData.get('asset_type') as string) || 'production';
   const customUploadDate = formData.get('upload_date') as string | null;
   const fileTypeOverride = formData.get('file_type_override') as string | null;
+  const expiresAt = formData.get('expires_at') as string | null;
 
   if (!slugId || !workspaceId) {
     return NextResponse.json(
@@ -359,6 +360,7 @@ export async function POST(request: NextRequest) {
           uploaded_by: uploadedBy || null,
           tags: tags ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
           file_hash: fileHash,
+          expires_at: expiresAt || null,
         })
         .select()
         .single();

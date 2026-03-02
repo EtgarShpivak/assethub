@@ -75,6 +75,8 @@ export default function UploadPage() {
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [assetType, setAssetType] = useState('production');
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
+  const [noExpiry, setNoExpiry] = useState(true);
+  const [expiresAt, setExpiresAt] = useState('');
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, 'pending' | 'uploading' | 'done' | 'error'>>({});
@@ -178,6 +180,7 @@ export default function UploadPage() {
       formData.append('slug_id', selectedSlug);
       formData.append('asset_type', assetType);
       formData.append('upload_date', uploadDate);
+      if (expiresAt) formData.append('expires_at', new Date(expiresAt).toISOString());
       if (selectedInitiative) formData.append('initiative_id', selectedInitiative);
       if (domainContext) formData.append('domain_context', domainContext);
       if (selectedPlatforms.length > 0) formData.append('platforms', JSON.stringify(selectedPlatforms));
@@ -224,6 +227,7 @@ export default function UploadPage() {
             initiative_id: selectedInitiative || undefined,
             upload_date: uploadDate,
             asset_type: assetType,
+            expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
           }),
         });
 
@@ -318,6 +322,7 @@ export default function UploadPage() {
                   tags: selectedTags.length > 0 ? selectedTags : undefined,
                   upload_date: uploadDate,
                   asset_type: assetType,
+                  expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
                 }),
               });
 
@@ -586,6 +591,17 @@ export default function UploadPage() {
               <Label className="flex items-center gap-1">תאריך המסמך המקורי <InfoTooltip text="תאריך המסמך המקורי. ברירת מחדל: היום. ניתן לשנות לתאריך ישן יותר אם מעלים חומר ישן." /></Label>
               <Input type="date" className="mt-1" value={uploadDate} onChange={e => setUploadDate(e.target.value)} />
               <p className="text-[10px] text-ono-gray mt-0.5">ברירת מחדל: היום. ניתן לשנות.</p>
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-1">תוקף תוכן <InfoTooltip text="הגדירו תאריך תפוגה לתוכן. לאחר התאריך התוכן יימחק אוטומטית מהמערכת." /></Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Checkbox checked={noExpiry} onCheckedChange={(c) => { setNoExpiry(!!c); if (c) setExpiresAt(''); }} className="h-4 w-4" />
+                <span className="text-sm text-ono-gray-dark">ללא הגבלת תוקף</span>
+              </div>
+              {!noExpiry && (
+                <Input type="date" className="mt-2" dir="ltr" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} min={new Date().toISOString().split('T')[0]} />
+              )}
             </div>
           </div>
 

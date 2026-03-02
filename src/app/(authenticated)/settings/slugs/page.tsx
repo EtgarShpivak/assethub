@@ -127,7 +127,6 @@ function SlugTreeNode({
 }
 
 export default function SlugManagerPage() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { showError, showSuccess } = useGlobalToast();
   const [slugs, setSlugs] = useState<SlugWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,10 +140,19 @@ export default function SlugManagerPage() {
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>('');
 
   const fetchSlugs = useCallback(async () => {
-    const res = await fetch('/api/slugs');
-    const data = await res.json();
-    setSlugs(data);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/slugs');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSlugs(data);
+      } else {
+        logClientError('slugs-fetch', data.error || 'Invalid response');
+      }
+    } catch (err) {
+      logClientError('slugs-fetch', String(err));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -152,9 +160,14 @@ export default function SlugManagerPage() {
     fetch('/api/workspaces')
       .then((r) => r.json())
       .then((data) => {
-        setWorkspaces(data);
-        if (data.length > 0) setSelectedWorkspace(data[0].id);
-      });
+        if (Array.isArray(data) && data.length > 0) {
+          setWorkspaces(data);
+          setSelectedWorkspace(data[0].id);
+        } else {
+          logClientError('workspaces-fetch', 'No workspaces returned');
+        }
+      })
+      .catch((err) => logClientError('workspaces-fetch', String(err)));
   }, [fetchSlugs]);
 
   const parentPreview = getParentSlug(newSlug);
@@ -163,34 +176,45 @@ export default function SlugManagerPage() {
     : null;
 
   const handleCreate = async () => {
-    if (!newSlug || !newDisplayName || !selectedWorkspace) return;
+    if (!newSlug || !newDisplayName) return;
+    if (!selectedWorkspace) {
+      setError('לא נמצאה סביבת עבודה. רענן את הדף ונסה שוב.');
+      return;
+    }
     setSaving(true);
     setError(null);
 
-    const res = await fetch('/api/slugs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        slug: newSlug,
-        display_name: newDisplayName,
-        description: newDescription || null,
-        workspace_id: selectedWorkspace,
-      }),
-    });
+    try {
+      const res = await fetch('/api/slugs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: newSlug,
+          display_name: newDisplayName,
+          description: newDescription || null,
+          workspace_id: selectedWorkspace,
+        }),
+      });
 
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error);
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'שגיאה ביצירת הסלאג');
+        setSaving(false);
+        return;
+      }
+
+      setNewSlug('');
+      setNewDisplayName('');
+      setNewDescription('');
+      setShowModal(false);
       setSaving(false);
-      return;
+      showSuccess('הסלאג נוצר בהצלחה');
+      fetchSlugs();
+    } catch (err) {
+      setError('שגיאת רשת — בדוק את החיבור ונסה שוב');
+      setSaving(false);
+      logClientError('slug-create', String(err));
     }
-
-    setNewSlug('');
-    setNewDisplayName('');
-    setNewDescription('');
-    setShowModal(false);
-    setSaving(false);
-    fetchSlugs();
   };
 
   const handleArchive = async (id: string, is_archived: boolean) => {
@@ -341,7 +365,7 @@ export default function SlugManagerPage() {
             </Button>
             <Button
               onClick={handleCreate}
-              disabled={saving || !newSlug || !newDisplayName}
+              disabled={saving || !newSlug || !newDisplayName || !selectedWorkspace}
               className="bg-ono-green hover:bg-ono-green-dark text-white"
             >
               {saving ? 'שומר...' : 'צור סלאג'}

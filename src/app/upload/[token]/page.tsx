@@ -38,6 +38,8 @@ export default function ExternalUploadPage() {
   const [uploadDone, setUploadDone] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ uploaded: number; errors: number; errorDetails?: string[] } | null>(null);
   const [uploadProgress, setUploadProgress] = useState<Record<number, 'pending' | 'uploading' | 'done' | 'error'>>({});
+  const [noExpiry, setNoExpiry] = useState(true);
+  const [expiresAt, setExpiresAt] = useState('');
 
   useEffect(() => {
     fetch(`/api/upload-tokens/${token}/validate`)
@@ -107,6 +109,7 @@ export default function ExternalUploadPage() {
       formData.append('workspace_id', tokenInfo.workspace_id);
       formData.append('slug_id', tokenInfo.slug_id);
       if (tokenInfo.initiative_id) formData.append('initiative_id', tokenInfo.initiative_id);
+      if (expiresAt) formData.append('expires_at', new Date(expiresAt).toISOString());
 
       try {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -146,6 +149,7 @@ export default function ExternalUploadPage() {
             slug_id: tokenInfo.slug_id,
             workspace_id: tokenInfo.workspace_id,
             initiative_id: tokenInfo.initiative_id || undefined,
+            expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
           }),
         });
 
@@ -209,6 +213,7 @@ export default function ExternalUploadPage() {
                   slug_id: tokenInfo.slug_id,
                   workspace_id: tokenInfo.workspace_id,
                   initiative_id: tokenInfo.initiative_id || undefined,
+                  expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
                 }),
               });
 
@@ -372,6 +377,32 @@ export default function ExternalUploadPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Content expiry */}
+        {files.length > 0 && (
+          <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] mb-6 p-4 space-y-2">
+            <label className="text-sm font-medium text-ono-gray-dark">תוקף תוכן</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={noExpiry}
+                onChange={(e) => { setNoExpiry(e.target.checked); if (e.target.checked) setExpiresAt(''); }}
+                className="h-4 w-4"
+              />
+              <span className="text-sm text-ono-gray">ללא הגבלת תוקף</span>
+            </div>
+            {!noExpiry && (
+              <input
+                type="date"
+                className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm"
+                dir="ltr"
+                value={expiresAt}
+                onChange={e => setExpiresAt(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+              />
+            )}
           </div>
         )}
 

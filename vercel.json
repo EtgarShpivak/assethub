@@ -17,6 +17,15 @@
     },
     "src/app/api/export/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/cron/cleanup-expired/route.ts": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-expired",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }
