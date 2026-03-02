@@ -1,15 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import JSZip from 'jszip';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-export async function POST(request: NextRequest) {
-  const supabase = createServiceRoleClient();
-  const body = await request.json();
+const MAX_ASSETS_PER_ZIP = 100;
 
-  const { asset_ids } = body;
+export async function POST(request: NextRequest) {
+  // Require authentication OR a valid share token
+  const user = await getAuthUser();
+  const body = await request.json();
+  const { asset_ids, share_token } = body;
+
+  // If not authenticated, require a valid share token
+  if (!user && !share_token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Validate share token if provided (for unauthenticated access)
+  const supabase = createServiceRoleClient();
+
+  if (!user && share_token) {
+    const { data: share } = await supabase
+      .from('shares')
+      .select('id, is_revoked, expires_at')
+      .eq('token', share_token)
+      .single();
+
+    if (!share || share.is_revoked || (share.expires_at && new Date(share.expires_at) < new Date())) {
+      return NextResponse.json({ error: 'קישור שיתוף לא חוקי או פג תוקף' }, { status: 403 });
+    }
+  }
 
   if (!asset_ids || !Array.isArray(asset_ids) || asset_ids.length === 0) {
     return NextResponse.json(
@@ -18,10 +40,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Limit number of assets to prevent OOM
+  if (asset_ids.length > MAX_ASSETS_PER_ZIP) {
+    return NextResponse.json(
+      { error: `ניתן להוריד עד ${MAX_ASSETS_PER_ZIP} קבצים בבת אחת` },
+      { status: 400 }
+    );
+  }
+
   // Get all selected assets
   const { data: assets, error } = await supabase
     .from('assets')
-    .select('id, drive_file_id, original_filename, mime_type')
+    .select('id, drive_file_id, original_filename, stored_filename, mime_type')
     .in('id', asset_ids);
 
   if (error || !assets) {
@@ -47,15 +77,15 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Handle duplicate filenames
-      let filename = asset.original_filename;
+      // Use stored_filename (smart name) for the zip entry
+      let filename = asset.stored_filename || asset.original_filename;
       const count = usedNames.get(filename) || 0;
       if (count > 0) {
         const ext = filename.split('.').pop() || '';
         const base = filename.slice(0, filename.length - ext.length - 1);
         filename = `${base}_${count}.${ext}`;
       }
-      usedNames.set(asset.original_filename, count + 1);
+      usedNames.set(asset.stored_filename || asset.original_filename, count + 1);
 
       const arrayBuffer = await fileData.arrayBuffer();
       zip.file(filename, arrayBuffer);

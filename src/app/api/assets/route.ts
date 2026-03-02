@@ -13,8 +13,10 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const { searchParams } = new URL(request.url);
 
-  // Sort params
-  const sortBy = searchParams.get('sort_by') || 'upload_date';
+  // Sort params — allowlist to prevent column injection
+  const SORT_ALLOWLIST = ['upload_date', 'original_filename', 'stored_filename', 'file_type', 'file_size', 'dimensions_label', 'aspect_ratio', 'created_at'];
+  const rawSortBy = searchParams.get('sort_by') || 'upload_date';
+  const sortBy = SORT_ALLOWLIST.includes(rawSortBy) ? rawSortBy : 'upload_date';
   const sortDir = searchParams.get('sort_dir') === 'asc' ? true : false;
 
   let query = supabase
@@ -210,7 +212,8 @@ export async function GET(request: NextRequest) {
   const { data, error, count } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Assets query error:', error.message);
+    return NextResponse.json({ error: 'שגיאה בטעינת חומרים' }, { status: 500 });
   }
 
   // Log searches (only when filters are active, not bare page loads)

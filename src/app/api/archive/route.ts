@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceRoleClient();
   const { searchParams } = new URL(request.url);
-  const sortBy = searchParams.get('sort_by') || 'upload_date';
+  // Sort params — allowlist to prevent column injection
+  const SORT_ALLOWLIST = ['upload_date', 'original_filename', 'stored_filename', 'file_type', 'file_size', 'archived_at', 'created_at'];
+  const rawSortBy = searchParams.get('sort_by') || 'upload_date';
+  const sortBy = SORT_ALLOWLIST.includes(rawSortBy) ? rawSortBy : 'upload_date';
   const sortDir = searchParams.get('sort_dir') === 'asc';
 
   const { data, error, count } = await supabase
@@ -29,7 +32,7 @@ export async function GET(request: NextRequest) {
       userId: user.id,
       entityType: 'asset',
     });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'שגיאה בטעינת חומרים מהארכיון' }, { status: 500 });
   }
 
   return NextResponse.json({ assets: data || [], total: count || 0 });

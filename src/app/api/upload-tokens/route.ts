@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
-  const { workspace_id, slug_id, initiative_id, created_by, expires_days } = body;
+  const { workspace_id, slug_id, initiative_id, expires_days } = body;
 
   if (!workspace_id || !slug_id) {
     return NextResponse.json({ error: 'שדות חובה חסרים' }, { status: 400 });
@@ -47,15 +47,44 @@ export async function POST(request: NextRequest) {
       workspace_id,
       slug_id,
       initiative_id: initiative_id || null,
-      created_by: created_by || null,
+      created_by: user.id, // Always use authenticated user, not client-provided value
       expires_at: expiresAt.toISOString(),
     })
     .select()
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Upload token creation error:', error.message);
+    return NextResponse.json({ error: 'שגיאה ביצירת טוקן העלאה' }, { status: 500 });
   }
 
   return NextResponse.json(data, { status: 201 });
+}
+
+// PATCH — revoke an upload token
+export async function PATCH(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createServiceRoleClient();
+  const body = await request.json();
+  const { id, is_revoked } = body;
+
+  if (!id) {
+    return NextResponse.json({ error: 'חסר מזהה טוקן' }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from('upload_tokens')
+    .update({ is_revoked: is_revoked ?? true })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Upload token revoke error:', error.message);
+    return NextResponse.json({ error: 'שגיאה בביטול הטוקן' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

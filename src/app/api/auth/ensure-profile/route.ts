@@ -1,28 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
+import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 // Called after login/signup to ensure user_profiles row exists
-export async function POST(request: NextRequest) {
-  const supabase = createServiceRoleClient();
-  const { user_id, email, display_name } = await request.json();
-
-  if (!user_id) {
-    return NextResponse.json({ error: 'user_id required' }, { status: 400 });
+// Only the authenticated user can create their own profile
+export async function POST() {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const supabase = createServiceRoleClient();
 
   // Check if profile exists
   const { data: existing } = await supabase
     .from('user_profiles')
     .select('id, is_active')
-    .eq('id', user_id)
+    .eq('id', user.id)
     .single();
 
   if (existing) {
     // Update email if missing
-    if (email) {
-      await supabase.from('user_profiles').update({ email }).eq('id', user_id).is('email', null);
+    if (user.email) {
+      await supabase.from('user_profiles').update({ email: user.email }).eq('id', user.id).is('email', null);
     }
     return NextResponse.json({ exists: true, inactive: existing.is_active === false });
   }
@@ -44,13 +45,13 @@ export async function POST(request: NextRequest) {
 
   const isFirstUser = (userCount || 0) === 0;
 
-  // Create profile
+  // Create profile — only for the authenticated user's own ID
   const { error } = await supabase
     .from('user_profiles')
     .insert({
-      id: user_id,
-      display_name: display_name || email || 'משתמש',
-      email: email || null,
+      id: user.id,
+      display_name: user.user_metadata?.full_name || user.email || 'משתמש',
+      email: user.email || null,
       role: isFirstUser ? 'admin' : 'media_buyer',
       workspace_ids: workspaceIds,
       permissions: isFirstUser

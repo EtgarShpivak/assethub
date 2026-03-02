@@ -5,10 +5,31 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Require authentication OR a valid share token
+  const user = await getAuthUser();
+  const shareToken = new URL(request.url).searchParams.get('share_token');
+
+  if (!user && !shareToken) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = createServiceRoleClient();
+
+  // Validate share token if provided (for unauthenticated access)
+  if (!user && shareToken) {
+    const { data: share } = await supabase
+      .from('shares')
+      .select('id, is_revoked, expires_at')
+      .eq('token', shareToken)
+      .single();
+
+    if (!share || share.is_revoked || (share.expires_at && new Date(share.expires_at) < new Date())) {
+      return NextResponse.json({ error: 'קישור שיתוף לא חוקי או פג תוקף' }, { status: 403 });
+    }
+  }
 
   const { data: asset, error } = await supabase
     .from('assets')
@@ -32,17 +53,15 @@ export async function GET(
     }
 
     // Log download activity (non-blocking)
-    getAuthUser().then(user => {
-      if (user) {
-        supabase.from('activity_log').insert({
-          user_id: user.id,
-          action: 'download',
-          entity_type: 'asset',
-          entity_id: params.id,
-          entity_name: asset.original_filename,
-        }).then(() => {});
-      }
-    }).catch(() => {});
+    if (user) {
+      supabase.from('activity_log').insert({
+        user_id: user.id,
+        action: 'download',
+        entity_type: 'asset',
+        entity_id: params.id,
+        entity_name: asset.original_filename,
+      }).then(() => {});
+    }
 
     // Convert Blob to ArrayBuffer for Vercel compatibility
     const arrayBuffer = await data.arrayBuffer();

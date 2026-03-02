@@ -222,7 +222,7 @@ export default function SettingsPage() {
 
   const handleRevokeToken = async (id: string) => {
     await fetch(`/api/upload-tokens`, {
-      method: 'POST',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, is_revoked: true }),
     });

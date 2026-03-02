@@ -22,6 +22,11 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
 
+  // Verify ownership — only the creator or shared collections are accessible
+  if (collection.created_by !== user.id && !collection.is_shared) {
+    return NextResponse.json({ error: 'אין גישה לאוסף זה' }, { status: 403 });
+  }
+
   // Get assets in collection
   const { data: collectionAssets } = await supabase
     .from('collection_assets')
@@ -43,6 +48,18 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createServiceRoleClient();
+
+  // Verify ownership before allowing modifications
+  const { data: collection } = await supabase
+    .from('collections')
+    .select('created_by')
+    .eq('id', params.id)
+    .single();
+
+  if (!collection || collection.created_by !== user.id) {
+    return NextResponse.json({ error: 'אין הרשאה לעדכן אוסף זה' }, { status: 403 });
+  }
+
   const body = await request.json();
 
   // Handle adding/removing assets
@@ -102,12 +119,16 @@ export async function DELETE(
 
   const supabase = createServiceRoleClient();
 
-  // Get name for logging
+  // Verify ownership before allowing deletion
   const { data: collInfo } = await supabase
     .from('collections')
-    .select('name')
+    .select('name, created_by')
     .eq('id', params.id)
     .single();
+
+  if (!collInfo || collInfo.created_by !== user.id) {
+    return NextResponse.json({ error: 'אין הרשאה למחוק אוסף זה' }, { status: 403 });
+  }
 
   const { error } = await supabase
     .from('collections')

@@ -48,9 +48,19 @@ export async function PATCH(
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
+  // Allowlist updatable fields to prevent overwriting id, slug_id, etc.
+  const ALLOWED_FIELDS = ['name', 'short_code', 'status', 'start_date', 'end_date', 'notes'];
+  const updates: Record<string, unknown> = {};
+  for (const key of ALLOWED_FIELDS) {
+    if (body[key] !== undefined) updates[key] = body[key];
+  }
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'לא סופקו שדות לעדכון' }, { status: 400 });
+  }
+
   const { data, error } = await supabase
     .from('initiatives')
-    .update(body)
+    .update(updates)
     .eq('id', params.id)
     .select()
     .single();
