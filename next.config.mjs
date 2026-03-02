@@ -25,10 +25,10 @@ const nextConfig = {
         ],
       },
       {
-        // Cache static API data (slugs, initiatives, tags) for 60s on CDN
-        source: '/api/(slugs|initiatives|tags|workspaces)',
+        // API routes must never be cached — data must always be fresh
+        source: '/api/:path*',
         headers: [
-          { key: 'Cache-Control', value: 's-maxage=60, stale-while-revalidate=120' },
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
         ],
       },
     ];
