@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, isAdminUser, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
-// GET all users (admin only)
+// GET all users (admin only) — enriched with inviter name and last sign-in
 export async function GET() {
   const admin = await isAdminUser();
   if (!admin) {
@@ -21,7 +22,48 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data || []);
+  const profiles = data || [];
+
+  // Build a lookup map for resolving invited_by UUIDs to display names
+  const profileMap = new Map(profiles.map(p => [p.id, p.display_name || p.email || 'משתמש']));
+
+  // Enrich each profile with invited_by_name and last_sign_in_at
+  const enrichedProfiles = await Promise.all(
+    profiles.map(async (profile) => {
+      // Resolve invited_by name
+      const invitedByName = profile.invited_by
+        ? profileMap.get(profile.invited_by) || null
+        : null;
+
+      // If inviter not in profiles map (e.g., deleted), try to resolve from auth
+      let finalInviterName = invitedByName;
+      if (profile.invited_by && !invitedByName) {
+        try {
+          const { data: inviterAuth } = await supabase.auth.admin.getUserById(profile.invited_by);
+          finalInviterName = inviterAuth?.user?.email || null;
+        } catch {
+          // Ignore — inviter may have been deleted
+        }
+      }
+
+      // Get last sign-in from Supabase Auth
+      let lastSignIn: string | null = null;
+      try {
+        const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
+        lastSignIn = authUser?.user?.last_sign_in_at || null;
+      } catch {
+        // Auth lookup failed
+      }
+
+      return {
+        ...profile,
+        invited_by_name: finalInviterName,
+        last_sign_in_at: lastSignIn,
+      };
+    })
+  );
+
+  return NextResponse.json(enrichedProfiles);
 }
 
 // POST - invite user by email (admin only)
@@ -31,6 +73,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'אין הרשאה' }, { status: 403 });
   }
 
+  const currentUser = await getAuthUser();
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
@@ -75,6 +118,16 @@ export async function POST(request: NextRequest) {
     if (!linkError && linkData?.properties?.hashed_token) {
       inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`;
     }
+
+    // Log the invite/re-invite
+    logActivity(request, {
+      action: 'create',
+      entityType: 'user',
+      entityId: existingUser.id,
+      entityName: email,
+      userId: currentUser?.id,
+      metadata: { role: role || 'viewer', re_invited: true },
+    });
 
     return NextResponse.json({ id: existingUser.id, updated: true, invite_link: inviteLink });
   }
@@ -135,6 +188,16 @@ export async function POST(request: NextRequest) {
     inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`;
   }
 
+  // Log the invite
+  logActivity(request, {
+    action: 'create',
+    entityType: 'user',
+    entityId: authData.user.id,
+    entityName: email,
+    userId: currentUser?.id,
+    metadata: { role: role || 'viewer', invited: true },
+  });
+
   return NextResponse.json({ id: authData.user.id, created: true, invite_link: inviteLink }, { status: 201 });
 }
 
@@ -145,6 +208,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'אין הרשאה' }, { status: 403 });
   }
 
+  const currentUser = await getAuthUser();
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
@@ -157,11 +221,10 @@ export async function PATCH(request: NextRequest) {
   // Prevent modifying another admin's role (admins can only be modified by themselves)
   const { data: targetUser } = await supabase
     .from('user_profiles')
-    .select('role')
+    .select('role, display_name, email')
     .eq('id', user_id)
     .single();
 
-  const currentUser = await getAuthUser();
   if (targetUser?.role === 'admin' && user_id !== currentUser?.id) {
     return NextResponse.json({ error: 'לא ניתן לשנות הרשאות של מנהל מערכת אחר' }, { status: 403 });
   }
@@ -181,6 +244,23 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Log the action
+  const actionDetail = is_active !== undefined
+    ? (is_active ? 'activate' : 'deactivate')
+    : 'edit';
+
+  logActivity(request, {
+    action: actionDetail,
+    entityType: 'user',
+    entityId: user_id,
+    entityName: targetUser?.display_name || targetUser?.email || user_id,
+    userId: currentUser?.id,
+    metadata: {
+      changes: updateData,
+      action_type: actionDetail,
+    },
+  });
+
   return NextResponse.json({ updated: true });
 }
 
@@ -191,6 +271,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'אין הרשאה' }, { status: 403 });
   }
 
+  const currentUser = await getAuthUser();
   const supabase = createServiceRoleClient();
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('user_id');
@@ -200,7 +281,6 @@ export async function DELETE(request: NextRequest) {
   }
 
   // Prevent deleting yourself
-  const currentUser = await getAuthUser();
   if (userId === currentUser?.id) {
     return NextResponse.json({ error: 'לא ניתן למחוק את עצמך' }, { status: 400 });
   }
@@ -208,7 +288,7 @@ export async function DELETE(request: NextRequest) {
   // Prevent deleting another admin
   const { data: targetUser } = await supabase
     .from('user_profiles')
-    .select('role, email')
+    .select('role, email, display_name')
     .eq('id', userId)
     .single();
 
@@ -236,6 +316,16 @@ export async function DELETE(request: NextRequest) {
     console.error('Auth deletion error (profile already deleted):', authError);
     // Profile was already deleted, just log the auth error
   }
+
+  // Log the deletion
+  logActivity(request, {
+    action: 'delete',
+    entityType: 'user',
+    entityId: userId,
+    entityName: targetUser.display_name || targetUser.email || userId,
+    userId: currentUser?.id,
+    metadata: { deleted_email: targetUser.email, deleted_role: targetUser.role },
+  });
 
   return NextResponse.json({ deleted: true, email: targetUser.email });
 }

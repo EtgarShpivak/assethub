@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Activity,
   AlertCircle,
@@ -48,6 +49,8 @@ const ACTION_LABELS: Record<string, string> = {
   search: 'חיפוש',
   download: 'הורדה',
   auto_delete_expired: 'מחיקה אוטומטית',
+  activate: 'הפעלה',
+  deactivate: 'השבתה',
 };
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
@@ -211,6 +214,8 @@ interface LogResponse {
 // ---------------------------------------------------------------------------
 
 export default function UnifiedActivityLogPage() {
+  const searchParams = useSearchParams();
+
   // Data state
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -224,12 +229,12 @@ export default function UnifiedActivityLogPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Filter state
+  // Filter state — initialize user filter from URL ?user= param
   const [activeTab, setActiveTab] = useState<TabId>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAction, setFilterAction] = useState('');
   const [filterEntityType, setFilterEntityType] = useState('');
-  const [filterUserId, setFilterUserId] = useState('');
+  const [filterUserId, setFilterUserId] = useState(searchParams.get('user') || '');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 

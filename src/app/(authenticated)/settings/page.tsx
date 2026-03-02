@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Settings,
   Users,
@@ -19,6 +20,9 @@ import {
   Mail,
   AlertTriangle,
   UserMinus,
+  ScrollText,
+  Clock,
+  UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -397,6 +401,27 @@ export default function SettingsPage() {
                         {user.permissions?.can_manage_initiatives && <span className="flex items-center gap-0.5"><Megaphone className="w-2.5 h-2.5" />מהלכים</span>}
                         {user.permissions?.can_view_filtered && <span className="flex items-center gap-0.5"><Filter className="w-2.5 h-2.5" />מסונן</span>}
                       </div>
+                      {/* Invited by + dates row */}
+                      <div className="flex items-center gap-3 text-[10px] text-ono-gray mt-0.5">
+                        {user.invited_by_name && (
+                          <span className="flex items-center gap-0.5">
+                            <UserCheck className="w-2.5 h-2.5" />
+                            הוזמן ע&quot;י {user.invited_by_name}
+                          </span>
+                        )}
+                        {user.created_at && (
+                          <span className="flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" />
+                            נוצר {new Date(user.created_at).toLocaleDateString('he-IL')}
+                          </span>
+                        )}
+                        {user.last_sign_in_at && (
+                          <span className="flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" />
+                            כניסה אחרונה {new Date(user.last_sign_in_at).toLocaleDateString('he-IL')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -405,6 +430,10 @@ export default function SettingsPage() {
                     ) : (
                       <Badge className="bg-ono-gray-light text-ono-gray text-[10px]">מושבת</Badge>
                     )}
+                    {/* Link to activity log filtered by this user */}
+                    <Link href={`/activity?user=${user.id}`} title="צפה בפעילות המשתמש" className="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 w-9 hover:bg-accent hover:text-accent-foreground">
+                      <ScrollText className="w-4 h-4 text-ono-gray" />
+                    </Link>
                     {user.id !== currentUserId && (
                       <>
                         <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)} title="ערוך הרשאות">
