@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,14 @@ export async function PUT(request: NextRequest) {
     if (!updateError) updated++;
   }
 
+  logActivity(request, {
+    action: 'edit',
+    entityType: 'tag',
+    entityName: `${oldName} → ${newName}`,
+    userId: user.id,
+    metadata: { old_name: oldName, new_name: newName, affected_assets: updated },
+  });
+
   return NextResponse.json({ updated });
 }
 
@@ -115,6 +124,14 @@ export async function DELETE(request: NextRequest) {
       .eq('id', asset.id);
     if (!updateError) updated++;
   }
+
+  logActivity(request, {
+    action: 'delete',
+    entityType: 'tag',
+    entityName: name,
+    userId: user.id,
+    metadata: { affected_assets: updated },
+  });
 
   return NextResponse.json({ updated });
 }

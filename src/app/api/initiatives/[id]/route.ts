@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,11 +59,20 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  logActivity(request, {
+    action: 'edit',
+    entityType: 'initiative',
+    entityId: params.id,
+    entityName: data.name,
+    userId: user.id,
+    metadata: { changes: body },
+  });
+
   return NextResponse.json(data);
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const user = await getAuthUser();
@@ -72,6 +82,13 @@ export async function DELETE(
 
   const supabase = createServiceRoleClient();
 
+  // Get name for logging
+  const { data: initInfo } = await supabase
+    .from('initiatives')
+    .select('name')
+    .eq('id', params.id)
+    .single();
+
   const { error } = await supabase
     .from('initiatives')
     .update({ status: 'archived' })
@@ -80,6 +97,14 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  logActivity(request, {
+    action: 'archive',
+    entityType: 'initiative',
+    entityId: params.id,
+    entityName: initInfo?.name || params.id,
+    userId: user.id,
+  });
 
   return NextResponse.json({ success: true });
 }

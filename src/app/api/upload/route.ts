@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { computeAspectRatio, computeDimensionsLabel, computeFileSizeLabel } from '@/lib/aspect-ratio';
 import { logServerError } from '@/lib/error-logger-server';
+import { logActivity } from '@/lib/activity-logger';
 import sharp from 'sharp';
 import JSZip from 'jszip';
 import { createHash } from 'crypto';
@@ -377,6 +378,24 @@ export async function POST(request: NextRequest) {
         });
       } else {
         results.push(asset);
+        // Log successful upload
+        logActivity(request, {
+          action: 'upload',
+          entityType: 'asset',
+          entityId: asset.id,
+          entityName: file.name,
+          userId: user.id,
+          workspaceId: workspaceId,
+          metadata: {
+            file_type: fileType,
+            file_size_bytes: file.size,
+            mime_type: file.mimeType,
+            slug_id: slugId,
+            initiative_id: initiativeId || null,
+            expires_at: expiresAt || null,
+            upload_method: 'zip',
+          },
+        });
       }
     } catch (err) {
       console.error('Upload error:', err);

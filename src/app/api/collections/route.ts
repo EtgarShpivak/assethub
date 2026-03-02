@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/error-logger-server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ...collection, warning: 'האוסף נוצר אך חלק מהחומרים לא נוספו' });
     }
   }
+
+  logActivity(request, {
+    action: 'create',
+    entityType: 'collection',
+    entityId: collection.id,
+    entityName: name,
+    userId: user.id,
+    workspaceId: workspaceId,
+    metadata: { is_shared: is_shared || false, asset_count: asset_ids?.length || 0 },
+  });
 
   return NextResponse.json(collection);
 }

@@ -15,7 +15,6 @@ import {
   Archive,
   Bookmark,
   ScrollText,
-  ShieldAlert,
   ChevronDown,
   Wrench,
 } from 'lucide-react';
@@ -62,7 +61,6 @@ const navEntries: NavEntry[] = [
     children: [
       { href: '/settings', label: 'משתמשים והרשאות', icon: Settings },
       { href: '/activity', label: 'יומן פעילות', icon: ScrollText },
-      { href: '/admin/system-log', label: 'לוג מערכת', icon: ShieldAlert, adminOnly: true },
     ],
   },
   { href: '/help', label: 'עזרה ותמיכה', icon: HelpCircle },

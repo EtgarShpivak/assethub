@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,16 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  logActivity(request, {
+    action: 'create',
+    entityType: 'slug',
+    entityId: data.id,
+    entityName: data.display_name,
+    userId: user.id,
+    workspaceId: workspace_id,
+    metadata: { slug: data.slug, display_name: data.display_name, description: data.description },
+  });
 
   return NextResponse.json(data, { status: 201 });
 }

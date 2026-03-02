@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,12 +77,24 @@ export async function PATCH(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  logActivity(request, {
+    action: 'edit',
+    entityType: 'collection',
+    entityId: params.id,
+    userId: user.id,
+    metadata: {
+      added_assets: body.add_asset_ids?.length || 0,
+      removed_assets: body.remove_asset_ids?.length || 0,
+      metadata_changes: Object.keys(updates),
+    },
+  });
+
   return NextResponse.json({ success: true });
 }
 
 // DELETE collection
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const user = await getAuthUser();
@@ -89,12 +102,27 @@ export async function DELETE(
 
   const supabase = createServiceRoleClient();
 
+  // Get name for logging
+  const { data: collInfo } = await supabase
+    .from('collections')
+    .select('name')
+    .eq('id', params.id)
+    .single();
+
   const { error } = await supabase
     .from('collections')
     .delete()
     .eq('id', params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  logActivity(request, {
+    action: 'delete',
+    entityType: 'collection',
+    entityId: params.id,
+    entityName: collInfo?.name || params.id,
+    userId: user.id,
+  });
 
   return NextResponse.json({ success: true });
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,11 +27,20 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  logActivity(request, {
+    action: 'edit',
+    entityType: 'slug',
+    entityId: params.id,
+    entityName: data.display_name || data.slug,
+    userId: user.id,
+    metadata: { changes: body },
+  });
+
   return NextResponse.json(data);
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const user = await getAuthUser();
@@ -39,6 +49,13 @@ export async function DELETE(
   }
 
   const supabase = createServiceRoleClient();
+
+  // Get slug info for logging before deleting
+  const { data: slugInfo } = await supabase
+    .from('slugs')
+    .select('slug, display_name')
+    .eq('id', params.id)
+    .single();
 
   // Check for associated assets
   const { count } = await supabase
@@ -61,6 +78,14 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  logActivity(request, {
+    action: 'delete',
+    entityType: 'slug',
+    entityId: params.id,
+    entityName: slugInfo?.display_name || slugInfo?.slug || params.id,
+    userId: user.id,
+  });
 
   return NextResponse.json({ success: true });
 }

@@ -5,6 +5,7 @@
  * DO NOT import this file from client components!
  */
 
+import { NextRequest } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 
 interface ServerErrorOptions {
@@ -16,6 +17,7 @@ interface ServerErrorOptions {
   entityName?: string | null;
   entityType?: string;      // e.g., 'asset', 'collection', 'system'
   extra?: Record<string, unknown>; // Any extra metadata
+  request?: NextRequest;    // Pass request to capture IP/UA
 }
 
 export async function logServerError(opts: ServerErrorOptions): Promise<void> {
@@ -39,6 +41,15 @@ export async function logServerError(opts: ServerErrorOptions): Promise<void> {
       }
     }
 
+    // Extract IP and User-Agent from request if available
+    const ip = opts.request
+      ? opts.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        opts.request.headers.get('x-real-ip') || 'unknown'
+      : null;
+    const userAgent = opts.request
+      ? opts.request.headers.get('user-agent') || 'unknown'
+      : null;
+
     await supabase.from('activity_log').insert({
       workspace_id: workspaceId,
       user_id: opts.userId || null,
@@ -52,6 +63,8 @@ export async function logServerError(opts: ServerErrorOptions): Promise<void> {
         error_message: opts.errorMessage,
         context: opts.context,
         timestamp: new Date().toISOString(),
+        ...(ip ? { ip } : {}),
+        ...(userAgent ? { user_agent: userAgent } : {}),
         ...(opts.extra || {}),
       },
     });

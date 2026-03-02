@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -210,6 +211,33 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Log searches (only when filters are active, not bare page loads)
+  const hasActiveFilters = slugId || initiativeId || fileType || platform ||
+    aspectRatio || dimensions || domainCtx || assetType || dateFrom || dateTo ||
+    search || tag || unclassified || expiry;
+
+  if (hasActiveFilters) {
+    logActivity(request, {
+      action: 'search',
+      entityType: 'search',
+      entityName: search || 'חיפוש מסננים',
+      userId: user.id,
+      metadata: {
+        filters: {
+          search: search || null,
+          slug_id: slugId || null,
+          initiative_id: initiativeId || null,
+          file_type: fileType || null,
+          platform: platform || null,
+          tag: tag || null,
+          expiry: expiry || null,
+        },
+        result_count: count || 0,
+        page,
+      },
+    });
   }
 
   return NextResponse.json({ assets: data, total: count });
