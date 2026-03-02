@@ -821,7 +821,7 @@ export default function AssetLibraryPage() {
                 {assets.map((asset, i) => (
                   <tr key={asset.id} className={`border-b border-[#E8E8E8] hover:bg-ono-gray-light/50 cursor-pointer ${i % 2 === 1 ? 'bg-ono-gray-light/30' : ''}`} onClick={() => setDetailAsset(asset)}>
                     <td className="p-3" onClick={e => e.stopPropagation()}><Checkbox checked={selectedAssets.has(asset.id)} onCheckedChange={() => toggleAssetSelection(asset.id)} /></td>
-                    <td className="p-3"><div className="flex items-center gap-2"><FileTypeIcon type={asset.file_type} size="sm" /><span className="text-ono-gray-dark truncate max-w-[200px]">{asset.original_filename}</span></div></td>
+                    <td className="p-3"><div className="flex items-center gap-2"><FileTypeIcon type={asset.file_type} size="sm" /><span className="text-ono-gray-dark truncate max-w-[200px]">{asset.stored_filename || asset.original_filename}</span></div></td>
                     <td className="p-3 text-ono-gray">{FILE_TYPES.find(f => f.value === asset.file_type)?.label}</td>
                     <td className="p-3 text-ono-gray font-mono text-xs">{asset.dimensions_label || '—'}</td>
                     <td className="p-3 text-ono-gray font-mono text-xs">{asset.aspect_ratio || '—'}</td>
@@ -931,7 +931,7 @@ export default function AssetLibraryPage() {
             <>
               <DialogHeader>
                 <div className="flex items-center justify-between">
-                  <DialogTitle className="text-lg">{detailAsset.original_filename}</DialogTitle>
+                  <DialogTitle className="text-lg">{detailAsset.stored_filename || detailAsset.original_filename}</DialogTitle>
                   <Button variant="ghost" size="sm" onClick={() => editMode ? setEditMode(false) : startEdit(detailAsset)}>
                     <Pencil className="w-4 h-4 ml-1" />
                     {editMode ? 'בטל עריכה' : 'ערוך'}
@@ -1181,7 +1181,7 @@ export default function AssetLibraryPage() {
           <DialogHeader><DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-orange-500" /> אישור העברה לארכיון</DialogTitle></DialogHeader>
           <div className="py-4">
             <p className="text-sm text-ono-gray">
-              האם להעביר את &quot;{showArchiveConfirm?.original_filename}&quot; לארכיון?
+              האם להעביר את &quot;{showArchiveConfirm?.stored_filename || showArchiveConfirm?.original_filename}&quot; לארכיון?
             </p>
             <p className="text-xs text-ono-gray mt-2">
               החומר לא יופיע בספרייה אך לא יימחק לצמיתות.

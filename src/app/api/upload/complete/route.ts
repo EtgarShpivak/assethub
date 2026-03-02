@@ -92,24 +92,8 @@ export async function POST(request: NextRequest) {
 
       const fileSizeLabel = computeFileSizeLabel(file.size);
 
-      // Compute hash for duplicate detection
+      // Compute hash for reference (stored in DB, no duplicate blocking)
       const fileHash = createHash('sha256').update(buffer).digest('hex');
-
-      // Check for duplicates
-      const { data: existingDuplicate } = await supabase
-        .from('assets')
-        .select('id, original_filename')
-        .eq('file_hash', fileHash)
-        .eq('is_archived', false)
-        .limit(1)
-        .single();
-
-      if (existingDuplicate) {
-        // Remove from storage since it's a duplicate
-        await supabase.storage.from('assets').remove([file.storagePath]);
-        errors.push({ file: file.originalName, error: `קובץ כפול: כבר קיים כ-"${existingDuplicate.original_filename}"` });
-        continue;
-      }
 
       // If image with dimensions, rename file with actual dimensions
       let finalPath = file.storagePath;

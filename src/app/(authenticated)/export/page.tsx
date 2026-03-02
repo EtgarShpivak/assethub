@@ -21,6 +21,7 @@ import type { Asset, Slug, Initiative } from '@/lib/types';
 interface ExportPreviewItem {
   asset_id: string;
   original_filename: string;
+  stored_filename?: string;
   export_filename: string;
   dimensions: string;
   file_type: string;
@@ -341,7 +342,7 @@ export default function ExportPage() {
                       </div>
                     </td>
                     <td className="p-3 text-ono-gray-dark text-xs truncate max-w-[200px]">
-                      {item.original_filename}
+                      {item.stored_filename || item.original_filename}
                     </td>
                     <td className="p-3 font-mono text-xs text-ono-gray-dark" dir="ltr">
                       {item.export_filename}

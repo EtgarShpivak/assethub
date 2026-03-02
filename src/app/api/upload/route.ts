@@ -297,21 +297,7 @@ export async function POST(request: NextRequest) {
       const storedFilename = `${baseName}-${runNumber}.${ext}`;
       const fullPath = `${storagePath}/${storedFilename}`;
 
-      // Check for duplicate file
-      const { data: existingDuplicate } = await supabase
-        .from('assets')
-        .select('id, original_filename, stored_filename')
-        .eq('file_hash', fileHash)
-        .eq('is_archived', false)
-        .limit(1)
-        .single();
-
-      if (existingDuplicate) {
-        errors.push({ file: file.name, error: `קובץ כפול: כבר קיים כ-"${existingDuplicate.original_filename}"` });
-        continue;
-      }
-
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage (no duplicate blocking — unique filenames guarantee no collisions)
       const { error: uploadError } = await supabase.storage
         .from('assets')
         .upload(fullPath, file.buffer, {

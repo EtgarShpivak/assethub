@@ -159,7 +159,7 @@ export default function InitiativeDetailPage() {
                   <FileTypeIcon type={asset.file_type} />
                 </div>
                 <p className="text-xs text-ono-gray-dark font-medium truncate">
-                  {asset.original_filename}
+                  {asset.stored_filename || asset.original_filename}
                 </p>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {asset.dimensions_label && (

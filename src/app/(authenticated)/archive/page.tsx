@@ -181,7 +181,7 @@ export default function ArchivePage() {
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <FileTypeIcon type={asset.file_type} size="sm" />
-                        <span className="text-ono-gray-dark truncate max-w-[250px]">{asset.original_filename}</span>
+                        <span className="text-ono-gray-dark truncate max-w-[250px]">{asset.stored_filename || asset.original_filename}</span>
                       </div>
                     </td>
                     <td className="p-3 text-ono-gray">{FILE_TYPES.find(f => f.value === asset.file_type)?.label || asset.file_type}</td>

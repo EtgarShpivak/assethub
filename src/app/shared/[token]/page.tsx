@@ -86,7 +86,10 @@ export default function SharedPage() {
   useEffect(() => {
     let result = [...assets];
     if (searchQuery) {
-      result = result.filter(a => a.original_filename.toLowerCase().includes(searchQuery.toLowerCase()));
+      result = result.filter(a =>
+        (a.stored_filename || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.original_filename.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
     if (filterFileType) {
       result = result.filter(a => a.file_type === filterFileType);
@@ -288,7 +291,7 @@ export default function SharedPage() {
                     {(asset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || asset.original_filename}
                     {asset.domain_context && ` · ${DOMAIN_CONTEXTS.find(d => d.value === asset.domain_context)?.label || ''}`}
                   </p>
-                  <p className="text-[10px] text-ono-gray truncate">{asset.original_filename}</p>
+                  <p className="text-[10px] text-ono-gray truncate">{asset.stored_filename || asset.original_filename}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {asset.dimensions_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.dimensions_label}</Badge>}
                     {asset.file_size_label && <Badge variant="outline" className="text-[10px] px-1.5 py-0">{asset.file_size_label}</Badge>}
@@ -315,7 +318,7 @@ export default function SharedPage() {
                 {filteredAssets.map((asset, i) => (
                   <tr key={asset.id} className={`border-b border-[#E8E8E8] hover:bg-ono-gray-light/50 ${i % 2 === 1 ? 'bg-ono-gray-light/30' : ''}`}>
                     <td className="p-3"><Checkbox checked={selectedAssets.has(asset.id)} onCheckedChange={() => toggleAssetSelection(asset.id)} /></td>
-                    <td className="p-3"><div className="flex items-center gap-2"><FileTypeIcon type={asset.file_type} size="sm" /><span className="text-ono-gray-dark truncate max-w-[250px]">{asset.original_filename}</span></div></td>
+                    <td className="p-3"><div className="flex items-center gap-2"><FileTypeIcon type={asset.file_type} size="sm" /><span className="text-ono-gray-dark truncate max-w-[250px]">{asset.stored_filename || asset.original_filename}</span></div></td>
                     <td className="p-3 text-ono-gray">{FILE_TYPES.find(f => f.value === asset.file_type)?.label || asset.file_type}</td>
                     <td className="p-3 text-ono-gray font-mono text-xs">{asset.dimensions_label || '—'}</td>
                     <td className="p-3 text-ono-gray">{asset.file_size_label || '—'}</td>

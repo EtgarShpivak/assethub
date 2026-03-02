@@ -462,7 +462,7 @@ export default function CollectionsPage() {
                 {/* Info */}
                 <div className="p-3">
                   <p className="text-xs font-medium text-ono-gray-dark truncate mb-1">
-                    {asset.original_filename}
+                    {asset.stored_filename || asset.original_filename}
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {asset.dimensions_label && (
@@ -558,7 +558,7 @@ export default function CollectionsPage() {
 
                           {/* Name */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-ono-gray-dark truncate">{asset.original_filename}</p>
+                            <p className="text-sm text-ono-gray-dark truncate">{asset.stored_filename || asset.original_filename}</p>
                             <p className="text-[10px] text-ono-gray">
                               {asset.dimensions_label || asset.file_size_label || ''}
                               {isInCollection && ' - כבר באוסף'}
