@@ -200,7 +200,8 @@ export async function POST(request: NextRequest) {
 
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE) {
-      errors.push({ file: file.name, error: 'קובץ גדול מ-2GB' });
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      errors.push({ file: file.name, error: `הקובץ גדול מדי (${sizeMB} MB). הגודל המקסימלי הוא 50MB.` });
       continue;
     }
 
@@ -224,7 +225,8 @@ export async function POST(request: NextRequest) {
         size: file.size,
       });
     } else {
-      errors.push({ file: file.name, error: `סוג קובץ לא נתמך: ${file.type}` });
+      const fileExt = file.name.split('.').pop()?.toUpperCase() || '';
+      errors.push({ file: file.name, error: `סוג קובץ לא נתמך (${fileExt}). סוגים נתמכים: תמונות, סרטונים, PDF, PSD, AI.` });
     }
   }
 
@@ -319,7 +321,7 @@ export async function POST(request: NextRequest) {
 
       if (uploadError) {
         console.error('Storage upload error:', uploadError);
-        errors.push({ file: file.name, error: `שגיאה בהעלאה לאחסון: ${uploadError.message}. נסה שוב או בדוק שהאחסון אינו מלא.` });
+        errors.push({ file: file.name, error: 'שגיאה בהעלאה לאחסון. ייתכן שהאחסון מלא — נסה שוב בעוד דקה.' });
         await logServerError({
           context: 'upload-storage',
           errorMessage: `Storage upload failed for ${file.name}: ${uploadError.message}`,
@@ -367,7 +369,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (dbError) {
-        errors.push({ file: file.name, error: `שגיאה בשמירת פרטי הקובץ: ${dbError.message}. הקובץ הועלה לאחסון אך לא נרשם במערכת.` });
+        errors.push({ file: file.name, error: 'הקובץ הועלה לאחסון אך לא נשמר במערכת. נסה להעלות שוב.' });
         await logServerError({
           context: 'upload-database',
           errorMessage: `DB insert failed for ${file.name}: ${dbError.message}`,
@@ -400,7 +402,7 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error('Upload error:', err);
       const errMsg = err instanceof Error ? err.message : String(err);
-      errors.push({ file: file.name, error: `שגיאה כללית בהעלאה: ${errMsg}` });
+      errors.push({ file: file.name, error: 'שגיאה בלתי צפויה בעיבוד הקובץ. נסה להעלות שוב.' });
       await logServerError({
         context: 'upload-general',
         errorMessage: `Upload failed for ${file.name}: ${errMsg}`,

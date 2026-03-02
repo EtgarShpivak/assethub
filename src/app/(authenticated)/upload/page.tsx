@@ -278,7 +278,22 @@ export default function UploadPage() {
                   } else {
                     progress[fileIdx] = 'error';
                     totalErrors++;
-                    allErrorDetails.push({ file: prepared.originalName, error: `שגיאה בהעלאה ישירה (${xhr.status})` });
+                    // Clear, actionable error messages based on status code
+                    let errorMsg = '';
+                    if (xhr.status === 400) {
+                      errorMsg = 'הקובץ נדחה על ידי השרת. ייתכן שפג תוקף הקישור — נסה להעלות שוב.';
+                    } else if (xhr.status === 403) {
+                      errorMsg = 'אין הרשאה להעלות קובץ זה. בדוק שהסלאג קיים ושיש לך גישה.';
+                    } else if (xhr.status === 404) {
+                      errorMsg = 'מיקום ההעלאה לא נמצא. ייתכן שהסלאג נמחק — נסה לבחור סלאג אחר.';
+                    } else if (xhr.status === 413) {
+                      errorMsg = 'הקובץ גדול מדי. הגודל המקסימלי הוא 50MB.';
+                    } else if (xhr.status >= 500) {
+                      errorMsg = 'שגיאת שרת. אחסון הקבצים לא זמין כרגע — נסה שוב בעוד דקה.';
+                    } else {
+                      errorMsg = `שגיאה בהעלאה (קוד ${xhr.status}). נסה שוב.`;
+                    }
+                    allErrorDetails.push({ file: prepared.originalName, error: errorMsg });
                     resolve();
                   }
                 };
@@ -286,7 +301,7 @@ export default function UploadPage() {
                 xhr.onerror = () => {
                   progress[fileIdx] = 'error';
                   totalErrors++;
-                  allErrorDetails.push({ file: prepared.originalName, error: 'שגיאת רשת בהעלאה' });
+                  allErrorDetails.push({ file: prepared.originalName, error: 'שגיאת רשת — בדוק את חיבור האינטרנט ונסה שוב.' });
                   resolve();
                 };
 
@@ -295,7 +310,7 @@ export default function UploadPage() {
             } catch {
               progress[fileIdx] = 'error';
               totalErrors++;
-              allErrorDetails.push({ file: prepared.originalName, error: 'שגיאת רשת בהעלאה' });
+              allErrorDetails.push({ file: prepared.originalName, error: 'שגיאת רשת — בדוק את חיבור האינטרנט ונסה שוב.' });
             }
             setUploadProgress({ ...progress });
           }

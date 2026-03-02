@@ -114,7 +114,8 @@ export async function POST(request: NextRequest) {
 
     // Validate type
     if (!isAllowedFile(file.name, file.type)) {
-      errors.push({ file: file.name, error: `סוג קובץ לא נתמך: ${file.type || file.name.split('.').pop()}` });
+      const fileExt = file.name.split('.').pop()?.toUpperCase() || '';
+      errors.push({ file: file.name, error: `סוג קובץ לא נתמך (${fileExt}). סוגים נתמכים: תמונות, סרטונים, PDF, PSD, AI.` });
       continue;
     }
 
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
       .createSignedUploadUrl(fullPath);
 
     if (signError || !signedData) {
-      errors.push({ file: file.name, error: 'שגיאה ביצירת קישור העלאה' });
+      errors.push({ file: file.name, error: 'לא ניתן ליצור קישור העלאה. ייתכן שהאחסון מלא — נסה שוב בעוד דקה.' });
       await logServerError({
         context: 'upload-prepare',
         errorMessage: `Signed URL creation failed for ${file.name}: ${signError?.message}`,

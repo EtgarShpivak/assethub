@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         .download(file.storagePath);
 
       if (downloadError || !fileData) {
-        errors.push({ file: file.originalName, error: `שגיאה בקריאת הקובץ מהאחסון: ${downloadError?.message}` });
+        errors.push({ file: file.originalName, error: 'לא ניתן לקרוא את הקובץ מהאחסון. ייתכן שההעלאה נכשלה — נסה להעלות שוב.' });
         continue;
       }
 
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (dbError) {
-        errors.push({ file: file.originalName, error: `שגיאה בשמירת פרטי הקובץ: ${dbError.message}` });
+        errors.push({ file: file.originalName, error: 'הקובץ הועלה לאחסון אך לא נשמר במערכת. נסה להעלות שוב.' });
         await logServerError({
           context: 'upload-complete-db',
           errorMessage: `DB insert failed for ${file.originalName}: ${dbError.message}`,
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      errors.push({ file: file.originalName, error: `שגיאה כללית: ${errMsg}` });
+      errors.push({ file: file.originalName, error: 'שגיאה בלתי צפויה בעיבוד הקובץ. נסה להעלות שוב.' });
       await logServerError({
         context: 'upload-complete-general',
         errorMessage: `Complete failed for ${file.originalName}: ${errMsg}`,
