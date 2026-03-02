@@ -10,8 +10,14 @@ const MAX_ASSETS_PER_ZIP = 100;
 export async function POST(request: NextRequest) {
   // Require authentication OR a valid share token
   const user = await getAuthUser();
-  const body = await request.json();
-  const { asset_ids, share_token } = body;
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'גוף הבקשה לא תקין' }, { status: 400 });
+  }
+  const { asset_ids, share_token } = body as { asset_ids?: string[]; share_token?: string };
 
   // If not authenticated, require a valid share token
   if (!user && !share_token) {

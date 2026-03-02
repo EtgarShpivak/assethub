@@ -76,14 +76,20 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'חסר מזהה טוקן' }, { status: 400 });
   }
 
-  const { error } = await supabase
+  // Scope to tokens created by the current user (or admin can revoke any)
+  const { error, count } = await supabase
     .from('upload_tokens')
     .update({ is_revoked: is_revoked ?? true })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('created_by', user.id);
 
   if (error) {
     console.error('Upload token revoke error:', error.message);
     return NextResponse.json({ error: 'שגיאה בביטול הטוקן' }, { status: 500 });
+  }
+
+  if (count === 0) {
+    return NextResponse.json({ error: 'טוקן לא נמצא או אין הרשאה' }, { status: 403 });
   }
 
   return NextResponse.json({ success: true });

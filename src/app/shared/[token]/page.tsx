@@ -107,7 +107,7 @@ export default function SharedPage() {
 
   const handleDownloadSingle = useCallback(async (asset: Asset) => {
     try {
-      const res = await fetch(`/api/assets/${asset.id}/download`);
+      const res = await fetch(`/api/assets/${asset.id}/download?share_token=${encodeURIComponent(token)}`);
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -116,7 +116,7 @@ export default function SharedPage() {
       document.body.appendChild(a); a.click();
       document.body.removeChild(a); URL.revokeObjectURL(url);
     } catch { /* silent */ }
-  }, []);
+  }, [token]);
 
   const handleDownloadSelected = async () => {
     const ids = Array.from(selectedAssets);
@@ -130,7 +130,7 @@ export default function SharedPage() {
       const res = await fetch('/api/assets/download-zip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset_ids: ids }),
+        body: JSON.stringify({ asset_ids: ids, share_token: token }),
       });
       if (!res.ok) { setDownloading(false); return; }
       const blob = await res.blob();
@@ -152,7 +152,7 @@ export default function SharedPage() {
       const res = await fetch('/api/assets/download-zip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset_ids: ids }),
+        body: JSON.stringify({ asset_ids: ids, share_token: token }),
       });
       if (!res.ok) { setDownloading(false); return; }
       const blob = await res.blob();

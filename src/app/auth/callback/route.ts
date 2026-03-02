@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
@@ -59,21 +60,42 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Create user profile on first login
+      // Create user profile on first login — use same logic as ensure-profile
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: existing } = await supabase
+        const serviceClient = createServiceRoleClient();
+        const { data: existing } = await serviceClient
           .from('user_profiles')
           .select('id')
           .eq('id', user.id)
           .single();
 
         if (!existing) {
-          await supabase.from('user_profiles').insert({
+          // Get the first workspace to auto-assign
+          const { data: workspaces } = await serviceClient
+            .from('workspaces')
+            .select('id')
+            .limit(1);
+
+          const workspaceIds = workspaces && workspaces.length > 0 ? [workspaces[0].id] : [];
+
+          // Check if this is the first user (make them admin)
+          const { count: userCount } = await serviceClient
+            .from('user_profiles')
+            .select('id', { count: 'exact', head: true });
+
+          const isFirstUser = (userCount || 0) === 0;
+
+          await serviceClient.from('user_profiles').insert({
             id: user.id,
-            display_name: user.user_metadata?.full_name || user.email,
-            role: 'media_buyer',
-            workspace_ids: [],
+            display_name: user.user_metadata?.full_name || user.email || 'משתמש',
+            email: user.email || null,
+            role: isFirstUser ? 'admin' : 'media_buyer',
+            workspace_ids: workspaceIds,
+            permissions: isFirstUser
+              ? { can_upload: true, can_view: true, can_manage_initiatives: true }
+              : { can_view: true },
+            is_active: true,
           });
         }
       }
