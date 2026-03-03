@@ -160,13 +160,16 @@ export default function SettingsPage() {
         // Not admin — don't show error, just skip
       } else {
         const errBody = await res.json().catch(() => ({}));
+        const errMsg = errBody?.error || `שגיאה ${res.status}`;
         console.error('fetchUsers error:', res.status, errBody);
-        showError('שגיאה בטעינת משתמשים', errBody?.error || `שגיאה ${res.status}`);
+        showError('שגיאה בטעינת משתמשים', errMsg);
+        logClientError('settings-fetch-users', `API ${res.status}: ${errMsg}`);
       }
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Network error';
       console.error('fetchUsers network error:', err);
-      logClientError('settings-fetch-users', 'Failed to fetch users list');
       showError('שגיאה בטעינת משתמשים', 'בדוק את החיבור לאינטרנט ורענן את הדף.');
+      logClientError('settings-fetch-users', `Network: ${errMsg}`);
     }
     return [] as UserProfile[];
   };

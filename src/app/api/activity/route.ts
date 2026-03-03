@@ -64,11 +64,12 @@ export async function GET(request: NextRequest) {
     });
     const uniqueUsers = Array.from(userMap.entries()).map(([id, name]) => ({ id, name }));
 
-    // Stats — run in parallel for performance
+    // Stats — run in parallel for performance (always unfiltered totals)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [errorRes, todayRes, uploadRes, searchRes] = await Promise.all([
+    const [totalRes, errorRes, todayRes, uploadRes, searchRes] = await Promise.all([
+      supabase.from('activity_log').select('*', { count: 'exact', head: true }),
       supabase.from('activity_log').select('*', { count: 'exact', head: true }).eq('action', 'error'),
       supabase.from('activity_log').select('*', { count: 'exact', head: true })
         .gte('created_at', todayStart.toISOString()),
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
       total: count || 0,
       users: uniqueUsers,
       stats: {
-        totalEvents: count || 0,
+        totalEvents: totalRes.count || 0,
         errorCount: errorRes.count || 0,
         todayCount: todayRes.count || 0,
         uploadCount: uploadRes.count || 0,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, isAdminUser, getAuthUser } from '@/lib/supabase/server';
 import { logActivity } from '@/lib/activity-logger';
+import { logServerError } from '@/lib/error-logger-server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -17,9 +18,14 @@ export async function GET() {
   const { data, error } = await supabase
     .from('user_profiles')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('display_name', { ascending: true });
 
   if (error) {
+    await logServerError({
+      context: 'users-list',
+      errorMessage: `Failed to fetch user profiles: ${error.message}`,
+      entityType: 'user',
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
