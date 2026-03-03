@@ -3,6 +3,7 @@ import { createServiceRoleClient, isAdminUser, getAuthUser } from '@/lib/supabas
 import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 // GET all users (admin only) — enriched with inviter name and last sign-in
 export async function GET() {
@@ -24,44 +25,41 @@ export async function GET() {
 
   const profiles = data || [];
 
+  // Fetch all auth users in a single call (avoids N+1 getUserById calls that timeout on serverless)
+  let authUsersMap = new Map<string, { last_sign_in_at: string | null; email: string | null }>();
+  try {
+    const { data: authList } = await supabase.auth.admin.listUsers();
+    if (authList?.users) {
+      authUsersMap = new Map(
+        authList.users.map(u => [u.id, { last_sign_in_at: u.last_sign_in_at || null, email: u.email || null }])
+      );
+    }
+  } catch {
+    // Auth listing failed — continue without enrichment
+  }
+
   // Build a lookup map for resolving invited_by UUIDs to display names
   const profileMap = new Map(profiles.map(p => [p.id, p.display_name || p.email || 'משתמש']));
 
-  // Enrich each profile with invited_by_name and last_sign_in_at
-  const enrichedProfiles = await Promise.all(
-    profiles.map(async (profile) => {
-      // Resolve invited_by name
-      const invitedByName = profile.invited_by
-        ? profileMap.get(profile.invited_by) || null
-        : null;
+  // Enrich each profile (no async calls needed — all data from single listUsers)
+  const enrichedProfiles = profiles.map((profile) => {
+    // Resolve invited_by name from profiles first, then from auth
+    let invitedByName: string | null = null;
+    if (profile.invited_by) {
+      invitedByName = profileMap.get(profile.invited_by)
+        || authUsersMap.get(profile.invited_by)?.email
+        || null;
+    }
 
-      // If inviter not in profiles map (e.g., deleted), try to resolve from auth
-      let finalInviterName = invitedByName;
-      if (profile.invited_by && !invitedByName) {
-        try {
-          const { data: inviterAuth } = await supabase.auth.admin.getUserById(profile.invited_by);
-          finalInviterName = inviterAuth?.user?.email || null;
-        } catch {
-          // Ignore — inviter may have been deleted
-        }
-      }
+    // Get last sign-in from auth lookup map
+    const lastSignIn = authUsersMap.get(profile.id)?.last_sign_in_at || null;
 
-      // Get last sign-in from Supabase Auth
-      let lastSignIn: string | null = null;
-      try {
-        const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
-        lastSignIn = authUser?.user?.last_sign_in_at || null;
-      } catch {
-        // Auth lookup failed
-      }
-
-      return {
-        ...profile,
-        invited_by_name: finalInviterName,
-        last_sign_in_at: lastSignIn,
-      };
-    })
-  );
+    return {
+      ...profile,
+      invited_by_name: invitedByName,
+      last_sign_in_at: lastSignIn,
+    };
+  });
 
   return NextResponse.json(enrichedProfiles);
 }
@@ -188,8 +186,8 @@ export async function POST(request: NextRequest) {
     inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`;
   }
 
-  // Log the invite
-  logActivity(request, {
+  // Log the invite (must await on serverless)
+  await logActivity(request, {
     action: 'create',
     entityType: 'user',
     entityId: authData.user.id,
@@ -249,7 +247,7 @@ export async function PATCH(request: NextRequest) {
     ? (is_active ? 'activate' : 'deactivate')
     : 'edit';
 
-  logActivity(request, {
+  await logActivity(request, {
     action: actionDetail,
     entityType: 'user',
     entityId: user_id,
@@ -318,7 +316,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   // Log the deletion
-  logActivity(request, {
+  await logActivity(request, {
     action: 'delete',
     entityType: 'user',
     entityId: userId,

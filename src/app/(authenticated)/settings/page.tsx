@@ -156,9 +156,17 @@ export default function SettingsPage() {
           setUsers(data as UserProfile[]);
           return data as UserProfile[];
         }
+      } else if (res.status === 403) {
+        // Not admin — don't show error, just skip
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        console.error('fetchUsers error:', res.status, errBody);
+        showError('שגיאה בטעינת משתמשים', errBody?.error || `שגיאה ${res.status}`);
       }
-    } catch {
+    } catch (err) {
+      console.error('fetchUsers network error:', err);
       logClientError('settings-fetch-users', 'Failed to fetch users list');
+      showError('שגיאה בטעינת משתמשים', 'בדוק את החיבור לאינטרנט ורענן את הדף.');
     }
     return [] as UserProfile[];
   };
