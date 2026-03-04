@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { FULL_PERMISSIONS, DEFAULT_PERMISSIONS } from '@/lib/types';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -90,12 +91,11 @@ export async function GET(request: Request) {
             id: user.id,
             display_name: user.user_metadata?.full_name || user.email || 'משתמש',
             email: user.email || null,
-            role: isFirstUser ? 'admin' : 'media_buyer',
+            role: isFirstUser ? 'admin' : 'viewer',
             workspace_ids: workspaceIds,
-            permissions: isFirstUser
-              ? { can_upload: true, can_view: true, can_manage_initiatives: true }
-              : { can_view: true },
+            permissions: isFirstUser ? FULL_PERMISSIONS : DEFAULT_PERMISSIONS,
             is_active: true,
+            is_deleted: false,
           });
         }
       }

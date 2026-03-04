@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     .from('assets')
     .select('id, stored_filename, drive_file_id, original_filename, workspace_id')
     .not('expires_at', 'is', null)
-    .lt('expires_at', new Date().toISOString())
+    .lt('expires_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .limit(100); // Process in batches
 
   if (error) {

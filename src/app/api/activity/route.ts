@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (tab === 'uploads') {
       query = query.eq('action', 'upload');
     } else if (tab === 'searches') {
-      query = query.eq('entity_type', 'search');
+      query = query.eq('action', 'download');
     } else if (tab === 'management') {
       query = query.in('entity_type', ['slug', 'initiative', 'collection', 'tag']);
     } else if (tab === 'errors') {
@@ -68,13 +68,13 @@ export async function GET(request: NextRequest) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [totalRes, errorRes, todayRes, uploadRes, searchRes] = await Promise.all([
+    const [totalRes, errorRes, todayRes, uploadRes, downloadRes] = await Promise.all([
       supabase.from('activity_log').select('*', { count: 'exact', head: true }),
       supabase.from('activity_log').select('*', { count: 'exact', head: true }).eq('action', 'error'),
       supabase.from('activity_log').select('*', { count: 'exact', head: true })
         .gte('created_at', todayStart.toISOString()),
       supabase.from('activity_log').select('*', { count: 'exact', head: true }).eq('action', 'upload'),
-      supabase.from('activity_log').select('*', { count: 'exact', head: true }).eq('entity_type', 'search'),
+      supabase.from('activity_log').select('*', { count: 'exact', head: true }).eq('action', 'download'),
     ]);
 
     return NextResponse.json({
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         errorCount: errorRes.count || 0,
         todayCount: todayRes.count || 0,
         uploadCount: uploadRes.count || 0,
-        searchCount: searchRes.count || 0,
+        downloadCount: downloadRes.count || 0,
       },
     });
   } catch (err) {
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       entries: [],
       total: 0,
       users: [],
-      stats: { totalEvents: 0, errorCount: 0, todayCount: 0, uploadCount: 0, searchCount: 0 },
+      stats: { totalEvents: 0, errorCount: 0, todayCount: 0, uploadCount: 0, downloadCount: 0 },
     });
   }
 }

@@ -84,23 +84,62 @@ export interface UserProfile {
   id: string;
   display_name: string | null;
   email: string | null;
-  role: 'admin' | 'initiative_manager' | 'media_buyer' | 'viewer';
+  role: string; // kept for backward compat — permissions is the source of truth
   workspace_ids: string[] | null;
   permissions: UserPermissions;
   is_active: boolean;
+  is_deleted?: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
   invited_by: string | null;
   invited_by_name?: string | null;
   view_filters: Record<string, string | string[]> | null;
   created_at?: string;
   last_sign_in_at?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface UserPermissions {
-  can_upload?: boolean;
   can_view?: boolean;
+  can_upload?: boolean;
+  can_delete_assets?: boolean;
+  can_manage_campaigns?: boolean; // renamed from can_manage_initiatives
+  can_manage_users?: boolean;
+  can_view_activity_log?: boolean;
+  // legacy — kept for backward compat, ignored in new code
   can_manage_initiatives?: boolean;
   can_view_filtered?: boolean;
 }
+
+// Default permissions for new invited users
+export const DEFAULT_PERMISSIONS: UserPermissions = {
+  can_view: true,
+  can_upload: false,
+  can_delete_assets: false,
+  can_manage_campaigns: false,
+  can_manage_users: false,
+  can_view_activity_log: false,
+};
+
+// Full permissions for admin / first user
+export const FULL_PERMISSIONS: UserPermissions = {
+  can_view: true,
+  can_upload: true,
+  can_delete_assets: true,
+  can_manage_campaigns: true,
+  can_manage_users: true,
+  can_view_activity_log: true,
+};
+
+// Permission definitions for UI rendering
+export const PERMISSION_DEFS: { key: keyof UserPermissions; label: string; description: string }[] = [
+  { key: 'can_view', label: 'צפייה בחומרים', description: 'צפייה בספריית החומרים' },
+  { key: 'can_upload', label: 'העלאת חומרים', description: 'העלאת חומרים חדשים למערכת' },
+  { key: 'can_delete_assets', label: 'מחיקת חומרים', description: 'מחיקה והעברה לארכיון של חומרים' },
+  { key: 'can_manage_campaigns', label: 'ניהול קמפיינים וסלאגים', description: 'יצירה ועריכה של קמפיינים וסלאגים' },
+  { key: 'can_manage_users', label: 'ניהול משתמשים', description: 'הזמנה, עריכה והשבתה של משתמשים' },
+  { key: 'can_view_activity_log', label: 'צפייה ביומן פעילות', description: 'גישה ליומן הפעילות של המערכת' },
+];
 
 export interface UploadToken {
   id: string;

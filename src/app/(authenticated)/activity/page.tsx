@@ -74,7 +74,6 @@ const ACTION_OPTIONS: { value: string; label: string }[] = [
   { value: 'share', label: 'שיתוף' },
   { value: 'create', label: 'יצירה' },
   { value: 'comment', label: 'הערה' },
-  { value: 'search', label: 'חיפוש' },
   { value: 'download', label: 'הורדה' },
   { value: 'error', label: 'שגיאה' },
 ];
@@ -107,7 +106,7 @@ type TabId = 'all' | 'uploads' | 'searches' | 'management' | 'errors';
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
   { id: 'all', label: 'הכל', color: 'text-ono-gray', activeColor: 'border-ono-green text-ono-green' },
   { id: 'uploads', label: 'העלאות', color: 'text-ono-gray', activeColor: 'border-ono-green text-ono-green' },
-  { id: 'searches', label: 'חיפושים', color: 'text-ono-gray', activeColor: 'border-blue-500 text-blue-600' },
+  { id: 'searches', label: 'הורדות', color: 'text-ono-gray', activeColor: 'border-blue-500 text-blue-600' },
   { id: 'management', label: 'ניהול', color: 'text-ono-gray', activeColor: 'border-purple-500 text-purple-600' },
   { id: 'errors', label: 'שגיאות', color: 'text-ono-gray', activeColor: 'border-red-500 text-red-600' },
 ];
@@ -266,7 +265,7 @@ interface LogStats {
   errorCount: number;
   todayCount: number;
   uploadCount: number;
-  searchCount: number;
+  downloadCount: number;
 }
 
 interface LogResponse {
@@ -292,7 +291,7 @@ export default function UnifiedActivityLogPage() {
     errorCount: 0,
     todayCount: 0,
     uploadCount: 0,
-    searchCount: 0,
+    downloadCount: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -351,7 +350,7 @@ export default function UnifiedActivityLogPage() {
       setTotal(data.total || 0);
       setUsers(data.users || []);
       setStats(
-        data.stats || { totalEvents: 0, errorCount: 0, todayCount: 0, uploadCount: 0, searchCount: 0 }
+        data.stats || { totalEvents: 0, errorCount: 0, todayCount: 0, uploadCount: 0, downloadCount: 0 }
       );
     } catch {
       setEntries([]);
@@ -395,9 +394,9 @@ export default function UnifiedActivityLogPage() {
           borderColor="border-[#E8E8E8]"
         />
         <StatCard
-          icon={<Search className="w-5 h-5 text-blue-500" />}
-          label="חיפושים"
-          value={stats.searchCount}
+          icon={<Download className="w-5 h-5 text-blue-500" />}
+          label="הורדות"
+          value={stats.downloadCount}
           bgColor="bg-blue-50"
           borderColor="border-[#E8E8E8]"
         />

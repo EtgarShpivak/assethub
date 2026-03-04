@@ -131,18 +131,18 @@ export default function AssetLibraryPage() {
 
   // Multi-select filters
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [filterSlugs, setFilterSlugs] = useState<string[]>([]);
-  const [filterInitiatives, setFilterInitiatives] = useState<string[]>([]);
-  const [filterFileTypes, setFilterFileTypes] = useState<string[]>([]);
+  const [filterSlugs, setFilterSlugs] = useState<string[]>(searchParams.get('slug_id') ? searchParams.get('slug_id')!.split(',') : []);
+  const [filterInitiatives, setFilterInitiatives] = useState<string[]>(searchParams.get('initiative_id') ? searchParams.get('initiative_id')!.split(',') : []);
+  const [filterFileTypes, setFilterFileTypes] = useState<string[]>(searchParams.get('file_type') ? searchParams.get('file_type')!.split(',') : []);
   const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
   const [filterAspectRatios, setFilterAspectRatios] = useState<string[]>([]);
   const [filterDomainContexts, setFilterDomainContexts] = useState<string[]>([]);
   const [filterAssetTypes, setFilterAssetTypes] = useState<string[]>([]);
   const [filterDimensions, setFilterDimensions] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('date_from') || '');
+  const [filterDateTo, setFilterDateTo] = useState(searchParams.get('date_to') || '');
   const [filterTag, setFilterTag] = useState('');
-  const [filterExpiry, setFilterExpiry] = useState('');
+  const [filterExpiry, setFilterExpiry] = useState(searchParams.get('expiry') || '');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeDatePreset, setActiveDatePreset] = useState('');
   const [page, setPage] = useState(1);
@@ -941,10 +941,10 @@ export default function AssetLibraryPage() {
 
           <div>
             <Label className="text-xs mb-1.5 block">תוקף</Label>
-            <select value={filterExpiry} onChange={e => setFilterExpiry(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-1.5 text-xs">
+            <select value={filterExpiry} onChange={e => { setFilterExpiry(e.target.value); setPage(1); }} className="w-full border border-[#E8E8E8] rounded-md p-1.5 text-xs">
               <option value="">הכל</option>
               <option value="valid">בתוקף</option>
-              <option value="expired">פג תוקף</option>
+              <option value="expiring_7days">פוקע ב-7 ימים</option>
               <option value="expiring_soon">פוקע ב-30 יום</option>
             </select>
           </div>

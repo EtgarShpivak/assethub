@@ -16,9 +16,9 @@ import {
   BarChart3,
   GraduationCap,
   Download,
-  Search,
   Tag as TagIcon,
   Eye,
+  Clock,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
@@ -46,6 +46,7 @@ interface DashboardClientProps {
   imageCount: number;
   videoCount: number;
   pdfCount: number;
+  expiringSoonCount: number;
 }
 
 function FileTypeIcon({ type }: { type: string }) {
@@ -106,6 +107,7 @@ export function DashboardClient({
   imageCount,
   videoCount,
   pdfCount,
+  expiringSoonCount,
 }: DashboardClientProps) {
   const [selectedSlug, setSelectedSlug] = useState<string>('all');
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -176,36 +178,36 @@ export function DashboardClient({
 
       {/* Stats cards - 2 rows */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+        <Link href="/assets" className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-ono-green transition-colors">
           <FolderOpen className="w-5 h-5 text-ono-green mx-auto mb-1" />
           <p className="text-2xl font-bold text-ono-gray-dark">{totalAssets}</p>
           <p className="text-[10px] text-ono-gray">סה&quot;כ חומרים</p>
-        </div>
-        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+        </Link>
+        <Link href="/initiatives" className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-ono-orange transition-colors">
           <Megaphone className="w-5 h-5 text-ono-orange mx-auto mb-1" />
           <p className="text-2xl font-bold text-ono-gray-dark">{activeInitiatives}</p>
           <p className="text-[10px] text-ono-gray">קמפיינים פעילים</p>
-        </div>
-        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+        </Link>
+        <Link href={`/assets?date_from=${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}&date_to=${new Date().toISOString().split('T')[0]}`} className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-blue-400 transition-colors">
           <TrendingUp className="w-5 h-5 text-blue-500 mx-auto mb-1" />
           <p className="text-2xl font-bold text-ono-gray-dark">{uploadsThisWeek}</p>
           <p className="text-[10px] text-ono-gray">העלאות השבוע</p>
-        </div>
-        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
+        </Link>
+        <Link href={`/assets?date_from=${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}&date_to=${new Date().toISOString().split('T')[0]}`} className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-purple-400 transition-colors">
           <Calendar className="w-5 h-5 text-purple-500 mx-auto mb-1" />
           <p className="text-2xl font-bold text-ono-gray-dark">{uploadsThisMonth}</p>
           <p className="text-[10px] text-ono-gray">העלאות החודש</p>
-        </div>
+        </Link>
         <Link href="/assets?unclassified=true" className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-ono-orange transition-colors">
           <AlertCircle className="w-5 h-5 text-ono-orange mx-auto mb-1" />
           <p className="text-2xl font-bold text-ono-gray-dark">{unclassifiedCount}</p>
           <p className="text-[10px] text-ono-gray">ממתינים לסיווג</p>
         </Link>
-        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
-          <BarChart3 className="w-5 h-5 text-ono-green mx-auto mb-1" />
-          <p className="text-2xl font-bold text-ono-gray-dark">{slugs.length}</p>
-          <p className="text-[10px] text-ono-gray">סלאגים פעילים</p>
-        </div>
+        <Link href="/assets?expiry=expiring_7days" className={`bg-white border rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-red-400 transition-colors ${expiringSoonCount > 0 ? 'border-red-200' : 'border-[#E8E8E8]'}`}>
+          <Clock className={`w-5 h-5 mx-auto mb-1 ${expiringSoonCount > 0 ? 'text-red-500' : 'text-ono-gray'}`} />
+          <p className={`text-2xl font-bold ${expiringSoonCount > 0 ? 'text-red-600' : 'text-ono-gray-dark'}`}>{expiringSoonCount}</p>
+          <p className="text-[10px] text-ono-gray">פוקעים ב-7 ימים</p>
+        </Link>
       </div>
 
       {/* Content type breakdown */}
@@ -527,7 +529,7 @@ export function DashboardClient({
             {/* Summary stats row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center">
-                <Search className="w-4 h-4 text-ono-gray mx-auto mb-1" />
+                <Download className="w-4 h-4 text-ono-gray mx-auto mb-1" />
                 <p className="text-xl font-bold text-ono-gray-dark">{analytics.neverDownloadedCount ?? 0}</p>
                 <p className="text-[10px] text-ono-gray">חומרים שלא הורדו אף פעם</p>
               </div>

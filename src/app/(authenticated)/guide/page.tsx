@@ -266,7 +266,7 @@ export default function UserGuidePage() {
         <div className="flex items-start gap-3">
           <Clock className="w-5 h-5 text-ono-green mt-0.5 shrink-0" />
           <p className="text-sm text-ono-gray-dark leading-relaxed">
-            לחומרים עם רישיון מוגבל או תוקף, ניתן להגדיר <strong>תאריך תפוגה</strong> ו<strong>הערות רישיון</strong>. חומרים שפג תוקפם <strong>נמחקים אוטומטית</strong> פעם ביום (כולל הקבצים מהאחסון). ניתן לסנן חומרים בספרייה לפי סטטוס תפוגה.
+            לחומרים עם רישיון מוגבל או תוקף, ניתן להגדיר <strong>תאריך תפוגה</strong> ו<strong>הערות רישיון</strong>. חומרים <strong>נמחקים אוטומטית יום אחד לאחר פקיעת התוקף</strong> (כולל הקבצים מהאחסון). בדשבורד מופיע כרטיס <strong>&ldquo;פוקעים ב-7 ימים&rdquo;</strong> עם התראה אדומה. ניתן לסנן בספרייה לפי: בתוקף, פוקעים ב-7 ימים, פוקעים ב-30 יום.
           </p>
         </div>
       </section>

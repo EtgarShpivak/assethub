@@ -2,23 +2,46 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, isAdminUser, getAuthUser } from '@/lib/supabase/server';
 import { logActivity } from '@/lib/activity-logger';
 import { logServerError } from '@/lib/error-logger-server';
+import { DEFAULT_PERMISSIONS } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 // GET all users (admin only) — enriched with inviter name and last sign-in
-export async function GET() {
+// Query params: ?filter=active|inactive|deleted&sort=name|last_login|created_at|email&dir=asc|desc
+export async function GET(request: NextRequest) {
   const admin = await isAdminUser();
   if (!admin) {
     return NextResponse.json({ error: 'אין הרשאה. רק מנהלי מערכת יכולים לגשת.' }, { status: 403 });
   }
 
   const supabase = createServiceRoleClient();
+  const { searchParams } = new URL(request.url);
+  const filter = searchParams.get('filter') || 'all'; // all | active | inactive | deleted
+  const sort = searchParams.get('sort') || 'display_name';
+  const dir = searchParams.get('dir') === 'desc' ? false : true; // ascending by default
 
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .order('display_name', { ascending: true });
+  let query = supabase.from('user_profiles').select('*');
+
+  // Filter by status
+  if (filter === 'active') {
+    query = query.eq('is_active', true).or('is_deleted.is.null,is_deleted.eq.false');
+  } else if (filter === 'inactive') {
+    query = query.eq('is_active', false).or('is_deleted.is.null,is_deleted.eq.false');
+  } else if (filter === 'deleted') {
+    query = query.eq('is_deleted', true);
+  }
+  // 'all' = no filter, returns everything including deleted
+
+  // Sort — display_name and email can be sorted by DB; last_login needs post-processing
+  if (sort === 'email' || sort === 'display_name') {
+    query = query.order(sort, { ascending: dir });
+  } else {
+    // Default sort for other cases; enrichment will handle last_login/created_at sort
+    query = query.order('display_name', { ascending: true });
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     await logServerError({
@@ -32,12 +55,16 @@ export async function GET() {
   const profiles = data || [];
 
   // Fetch all auth users in a single call (avoids N+1 getUserById calls that timeout on serverless)
-  let authUsersMap = new Map<string, { last_sign_in_at: string | null; email: string | null }>();
+  let authUsersMap = new Map<string, { last_sign_in_at: string | null; email: string | null; created_at: string | null }>();
   try {
     const { data: authList } = await supabase.auth.admin.listUsers();
     if (authList?.users) {
       authUsersMap = new Map(
-        authList.users.map(u => [u.id, { last_sign_in_at: u.last_sign_in_at || null, email: u.email || null }])
+        authList.users.map(u => [u.id, {
+          last_sign_in_at: u.last_sign_in_at || null,
+          email: u.email || null,
+          created_at: u.created_at || null,
+        }])
       );
     }
   } catch {
@@ -49,7 +76,6 @@ export async function GET() {
 
   // Enrich each profile (no async calls needed — all data from single listUsers)
   const enrichedProfiles = profiles.map((profile) => {
-    // Resolve invited_by name from profiles first, then from auth
     let invitedByName: string | null = null;
     if (profile.invited_by) {
       invitedByName = profileMap.get(profile.invited_by)
@@ -57,15 +83,32 @@ export async function GET() {
         || null;
     }
 
-    // Get last sign-in from auth lookup map
-    const lastSignIn = authUsersMap.get(profile.id)?.last_sign_in_at || null;
+    const authInfo = authUsersMap.get(profile.id);
+    const lastSignIn = authInfo?.last_sign_in_at || null;
+    const authCreatedAt = authInfo?.created_at || null;
 
     return {
       ...profile,
       invited_by_name: invitedByName,
       last_sign_in_at: lastSignIn,
+      created_at: authCreatedAt,
     };
   });
+
+  // Post-processing sort for last_login and created_at (not in DB)
+  if (sort === 'last_login') {
+    enrichedProfiles.sort((a, b) => {
+      const aDate = a.last_sign_in_at ? new Date(a.last_sign_in_at).getTime() : 0;
+      const bDate = b.last_sign_in_at ? new Date(b.last_sign_in_at).getTime() : 0;
+      return dir ? aDate - bDate : bDate - aDate;
+    });
+  } else if (sort === 'created_at') {
+    enrichedProfiles.sort((a, b) => {
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dir ? aDate - bDate : bDate - aDate;
+    });
+  }
 
   return NextResponse.json(enrichedProfiles);
 }
@@ -81,32 +124,44 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
-  const { email, role, permissions, view_filters, invited_by } = body;
+  const { email, permissions, invited_by } = body;
 
   if (!email) {
     return NextResponse.json({ error: 'כתובת מייל נדרשת' }, { status: 400 });
   }
 
+  const finalPermissions = permissions || DEFAULT_PERMISSIONS;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://assethub-seven.vercel.app';
 
   // Check if user already exists in auth
   const { data: existingUsers } = await supabase.auth.admin.listUsers();
   const existingUser = existingUsers?.users?.find(u => u.email === email);
 
+  // Also check if there's a soft-deleted profile for this email
+  const { data: existingProfile } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('email', email)
+    .maybeSingle();
+
   if (existingUser) {
-    // User exists in auth — update their profile and generate a new invite link
+    // User exists in auth — update/reactivate their profile and generate a new invite link
+    const upsertData: Record<string, unknown> = {
+      id: existingUser.id,
+      display_name: existingProfile?.display_name || existingUser.user_metadata?.full_name || email.split('@')[0],
+      email,
+      role: existingProfile?.role || 'viewer',
+      permissions: finalPermissions,
+      is_active: true,
+      is_deleted: false,
+      deleted_at: null,
+      deleted_by: null,
+      invited_by: invited_by || existingProfile?.invited_by || null,
+    };
+
     const { error: updateError } = await supabase
       .from('user_profiles')
-      .upsert({
-        id: existingUser.id,
-        display_name: existingUser.user_metadata?.full_name || email.split('@')[0],
-        email,
-        role: role || 'viewer',
-        permissions: permissions || {},
-        view_filters: view_filters || null,
-        is_active: true,
-        invited_by: invited_by || null,
-      });
+      .upsert(upsertData);
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
@@ -123,14 +178,13 @@ export async function POST(request: NextRequest) {
       inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`;
     }
 
-    // Log the invite/re-invite
     await logActivity(request, {
       action: 'create',
       entityType: 'user',
       entityId: existingUser.id,
       entityName: email,
       userId: currentUser?.id,
-      metadata: { role: role || 'viewer', re_invited: true },
+      metadata: { permissions: finalPermissions, re_invited: true, reactivated: existingProfile?.is_deleted === true },
     });
 
     return NextResponse.json({ id: existingUser.id, updated: true, invite_link: inviteLink });
@@ -141,7 +195,7 @@ export async function POST(request: NextRequest) {
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password: tempPassword,
-    email_confirm: true, // Mark email as confirmed so they can log in after setting password
+    email_confirm: true,
   });
 
   if (authError) {
@@ -161,27 +215,31 @@ export async function POST(request: NextRequest) {
 
   const workspaceIds = workspaces?.length ? [workspaces[0].id] : [];
 
-  // Create profile
+  // Create profile — if soft-deleted profile exists for this email, reuse it
+  const profileData = {
+    id: authData.user.id,
+    display_name: email.split('@')[0],
+    email,
+    role: 'viewer',
+    workspace_ids: workspaceIds,
+    permissions: finalPermissions,
+    invited_by: invited_by || null,
+    is_active: true,
+    is_deleted: false,
+    deleted_at: null,
+    deleted_by: null,
+  };
+
   const { error: profileError } = await supabase
     .from('user_profiles')
-    .insert({
-      id: authData.user.id,
-      display_name: email.split('@')[0],
-      email,
-      role: role || 'viewer',
-      workspace_ids: workspaceIds,
-      permissions: permissions || {},
-      view_filters: view_filters || null,
-      invited_by: invited_by || null,
-      is_active: true,
-    });
+    .insert(profileData);
 
   if (profileError) {
     console.error('Profile creation error:', profileError);
     return NextResponse.json({ error: profileError.message }, { status: 500 });
   }
 
-  // Generate invite link (recovery type so user can set their own password)
+  // Generate invite link
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email,
@@ -192,20 +250,19 @@ export async function POST(request: NextRequest) {
     inviteLink = `${appUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`;
   }
 
-  // Log the invite (must await on serverless)
   await logActivity(request, {
     action: 'create',
     entityType: 'user',
     entityId: authData.user.id,
     entityName: email,
     userId: currentUser?.id,
-    metadata: { role: role || 'viewer', invited: true },
+    metadata: { permissions: finalPermissions, invited: true },
   });
 
   return NextResponse.json({ id: authData.user.id, created: true, invite_link: inviteLink }, { status: 201 });
 }
 
-// PATCH - update user permissions (admin only)
+// PATCH - update user permissions/status (admin only)
 export async function PATCH(request: NextRequest) {
   const admin = await isAdminUser();
   if (!admin) {
@@ -216,27 +273,26 @@ export async function PATCH(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
-  const { user_id, role, permissions, view_filters, is_active } = body;
+  const { user_id, permissions, is_active } = body;
 
   if (!user_id) {
     return NextResponse.json({ error: 'user_id required' }, { status: 400 });
   }
 
-  // Prevent modifying another admin's role (admins can only be modified by themselves)
   const { data: targetUser } = await supabase
     .from('user_profiles')
-    .select('role, display_name, email')
+    .select('role, display_name, email, permissions')
     .eq('id', user_id)
     .single();
 
-  if (targetUser?.role === 'admin' && user_id !== currentUser?.id) {
+  // Prevent modifying another user who has can_manage_users (unless it's yourself)
+  const targetPerms = targetUser?.permissions as Record<string, boolean> | null;
+  if ((targetPerms?.can_manage_users || targetUser?.role === 'admin') && user_id !== currentUser?.id) {
     return NextResponse.json({ error: 'לא ניתן לשנות הרשאות של מנהל מערכת אחר' }, { status: 403 });
   }
 
   const updateData: Record<string, unknown> = {};
-  if (role !== undefined) updateData.role = role;
   if (permissions !== undefined) updateData.permissions = permissions;
-  if (view_filters !== undefined) updateData.view_filters = view_filters;
   if (is_active !== undefined) updateData.is_active = is_active;
 
   const { error } = await supabase
@@ -248,7 +304,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Log the action
   const actionDetail = is_active !== undefined
     ? (is_active ? 'activate' : 'deactivate')
     : 'edit';
@@ -268,7 +323,7 @@ export async function PATCH(request: NextRequest) {
   return NextResponse.json({ updated: true });
 }
 
-// DELETE - remove a non-admin user from the system (admin only)
+// DELETE - soft-delete user (admin only) — marks as deleted, preserves history
 export async function DELETE(request: NextRequest) {
   const admin = await isAdminUser();
   if (!admin) {
@@ -284,15 +339,13 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'user_id required' }, { status: 400 });
   }
 
-  // Prevent deleting yourself
   if (userId === currentUser?.id) {
     return NextResponse.json({ error: 'לא ניתן למחוק את עצמך' }, { status: 400 });
   }
 
-  // Prevent deleting another admin
   const { data: targetUser } = await supabase
     .from('user_profiles')
-    .select('role, email, display_name')
+    .select('role, email, display_name, permissions')
     .eq('id', userId)
     .single();
 
@@ -300,35 +353,40 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'משתמש לא נמצא' }, { status: 404 });
   }
 
-  if (targetUser.role === 'admin') {
+  // Prevent deleting users with can_manage_users permission
+  const targetPerms = targetUser.permissions as Record<string, boolean> | null;
+  if (targetPerms?.can_manage_users || targetUser.role === 'admin') {
     return NextResponse.json({ error: 'לא ניתן למחוק מנהל מערכת. ניתן רק להשבית אותו.' }, { status: 403 });
   }
 
-  // Delete profile first
-  const { error: profileError } = await supabase
+  // Soft delete: mark as deleted, keep profile for history
+  const { error: updateError } = await supabase
     .from('user_profiles')
-    .delete()
+    .update({
+      is_deleted: true,
+      is_active: false,
+      deleted_at: new Date().toISOString(),
+      deleted_by: currentUser?.id || null,
+    })
     .eq('id', userId);
 
-  if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  // Delete from Supabase Auth
+  // Delete from Supabase Auth (prevents login but profile remains)
   const { error: authError } = await supabase.auth.admin.deleteUser(userId);
   if (authError) {
-    console.error('Auth deletion error (profile already deleted):', authError);
-    // Profile was already deleted, just log the auth error
+    console.error('Auth deletion error (profile soft-deleted):', authError);
   }
 
-  // Log the deletion
   await logActivity(request, {
     action: 'delete',
     entityType: 'user',
     entityId: userId,
     entityName: targetUser.display_name || targetUser.email || userId,
     userId: currentUser?.id,
-    metadata: { deleted_email: targetUser.email, deleted_role: targetUser.role },
+    metadata: { deleted_email: targetUser.email, soft_delete: true },
   });
 
   return NextResponse.json({ deleted: true, email: targetUser.email });

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
-import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -193,8 +192,12 @@ export async function GET(request: NextRequest) {
   const expiry = searchParams.get('expiry');
   if (expiry === 'valid') {
     query = query.or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
-  } else if (expiry === 'expired') {
-    query = query.not('expires_at', 'is', null).lt('expires_at', new Date().toISOString());
+  } else if (expiry === 'expiring_7days') {
+    const in7Days = new Date();
+    in7Days.setDate(in7Days.getDate() + 7);
+    query = query.not('expires_at', 'is', null)
+      .gte('expires_at', new Date().toISOString())
+      .lte('expires_at', in7Days.toISOString());
   } else if (expiry === 'expiring_soon') {
     const in30Days = new Date();
     in30Days.setDate(in30Days.getDate() + 30);
@@ -214,33 +217,6 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error('Assets query error:', error.message);
     return NextResponse.json({ error: 'שגיאה בטעינת חומרים' }, { status: 500 });
-  }
-
-  // Log searches (only when filters are active, not bare page loads)
-  const hasActiveFilters = slugId || initiativeId || fileType || platform ||
-    aspectRatio || dimensions || domainCtx || assetType || dateFrom || dateTo ||
-    search || tag || unclassified || expiry;
-
-  if (hasActiveFilters) {
-    await logActivity(request, {
-      action: 'search',
-      entityType: 'search',
-      entityName: search || 'חיפוש מסננים',
-      userId: user.id,
-      metadata: {
-        filters: {
-          search: search || null,
-          slug_id: slugId || null,
-          initiative_id: initiativeId || null,
-          file_type: fileType || null,
-          platform: platform || null,
-          tag: tag || null,
-          expiry: expiry || null,
-        },
-        result_count: count || 0,
-        page,
-      },
-    });
   }
 
   return NextResponse.json({ assets: data, total: count });

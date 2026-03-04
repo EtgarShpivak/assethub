@@ -10,6 +10,7 @@ export default async function DashboardPage() {
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   // Fetch dashboard stats
   const [
@@ -24,6 +25,7 @@ export default async function DashboardPage() {
     imageCount,
     videoCount,
     pdfCount,
+    expiringSoonResult,
   ] = await Promise.all([
     supabase.from('assets').select('*', { count: 'exact', head: true }).eq('is_archived', false),
     supabase.from('initiatives').select('*', { count: 'exact', head: true }).in('status', ['active', 'ongoing']),
@@ -38,6 +40,11 @@ export default async function DashboardPage() {
     supabase.from('assets').select('*', { count: 'exact', head: true }).eq('is_archived', false).eq('file_type', 'image'),
     supabase.from('assets').select('*', { count: 'exact', head: true }).eq('is_archived', false).eq('file_type', 'video'),
     supabase.from('assets').select('*', { count: 'exact', head: true }).eq('is_archived', false).eq('file_type', 'pdf'),
+    supabase.from('assets').select('*', { count: 'exact', head: true })
+      .eq('is_archived', false)
+      .not('expires_at', 'is', null)
+      .gte('expires_at', new Date().toISOString())
+      .lte('expires_at', in7Days),
   ]);
 
   return (
@@ -53,6 +60,7 @@ export default async function DashboardPage() {
       imageCount={imageCount.count || 0}
       videoCount={videoCount.count || 0}
       pdfCount={pdfCount.count || 0}
+      expiringSoonCount={expiringSoonResult.count || 0}
     />
   );
 }
