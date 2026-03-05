@@ -249,12 +249,15 @@ export default function UploadPage() {
             setUploadProgress({ ...progress });
           }
 
-          // B2: Upload each file directly to Supabase via signed URL (XHR for progress)
+          // B2: Upload files in parallel (up to 3 concurrent) via signed URLs (XHR for progress)
           const successfulUploads: typeof prepareData.files = [];
-          for (const prepared of prepareData.files || []) {
+          const CONCURRENCY = 3;
+          const preparedFiles = prepareData.files || [];
+
+          const uploadOne = async (prepared: typeof preparedFiles[0]) => {
             const fileEntry = directFiles.find(f => f.name === prepared.originalName);
             const fileIdx = files.findIndex(f => f.name === prepared.originalName);
-            if (!fileEntry || fileIdx < 0) continue;
+            if (!fileEntry || fileIdx < 0) return;
 
             try {
               await new Promise<void>((resolve) => {
@@ -278,7 +281,6 @@ export default function UploadPage() {
                   } else {
                     progress[fileIdx] = 'error';
                     totalErrors++;
-                    // Clear, actionable error messages based on status code
                     let errorMsg = '';
                     if (xhr.status === 400) {
                       errorMsg = 'הקובץ נדחה על ידי השרת. ייתכן שפג תוקף הקישור — נסה להעלות שוב.';
@@ -313,6 +315,12 @@ export default function UploadPage() {
               allErrorDetails.push({ file: prepared.originalName, error: 'שגיאת רשת — בדוק את חיבור האינטרנט ונסה שוב.' });
             }
             setUploadProgress({ ...progress });
+          };
+
+          // Process in batches of CONCURRENCY
+          for (let i = 0; i < preparedFiles.length; i += CONCURRENCY) {
+            const batch = preparedFiles.slice(i, i + CONCURRENCY);
+            await Promise.all(batch.map(uploadOne));
           }
 
           // B3: Complete — create DB records for successful uploads
@@ -475,7 +483,8 @@ export default function UploadPage() {
       >
         <UploadIcon className="w-12 h-12 text-ono-green mx-auto mb-4" />
         <p className="text-ono-gray-dark font-medium mb-1">גררו קבצים לכאן או לחצו לבחירה</p>
-        <p className="text-sm text-ono-gray">תמונות, וידאו, PDF, ידיעונים (InDesign, AI, HTML, PPTX, DOCX), ZIP — עד 50MB</p>
+        <p className="text-sm text-ono-green font-medium">ניתן להעלות מספר קבצים במקביל</p>
+        <p className="text-sm text-ono-gray mt-1">תמונות, וידאו, PDF, ידיעונים (InDesign, AI, HTML, PPTX, DOCX), ZIP — עד 50MB לקובץ</p>
         <p className="text-xs text-ono-orange mt-2">קבצי ZIP ייפתחו אוטומטית — כל קובץ מוכר בתוכם יועלה בנפרד</p>
         <input
           id="file-input"

@@ -3,6 +3,7 @@ import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/error-logger-server';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -104,6 +105,10 @@ export async function POST(request: NextRequest) {
   }[] = [];
   const errors: { file: string; error: string }[] = [];
 
+  // Track how many files of each (prefix, ext) we've already seen in THIS batch
+  // to avoid duplicate filenames when uploading multiple files of the same type
+  const batchCounts: Record<string, number> = {};
+
   for (const file of files) {
     // Validate size
     if (file.size > MAX_FILE_SIZE) {
@@ -140,7 +145,13 @@ export async function POST(request: NextRequest) {
       .eq('file_type', detectedType)
       .like('stored_filename', `${namePrefix}-%`);
 
-    const runNumber = String((existingCount || 0) + 1).padStart(2, '0');
+    // Add batch offset so multiple files of same type get unique numbers
+    const batchKey = `${namePrefix}-${ext}`;
+    batchCounts[batchKey] = (batchCounts[batchKey] || 0);
+    const batchOffset = batchCounts[batchKey];
+    batchCounts[batchKey]++;
+
+    const runNumber = String((existingCount || 0) + 1 + batchOffset).padStart(2, '0');
     const storedFilename = `${namePrefix}-nodim-${runNumber}.${ext}`;
     const fullPath = `${storagePath}/${storedFilename}`;
 
