@@ -88,9 +88,6 @@ export interface UserProfile {
   workspace_ids: string[] | null;
   permissions: UserPermissions;
   is_active: boolean;
-  is_deleted?: boolean;
-  deleted_at?: string | null;
-  deleted_by?: string | null;
   invited_by: string | null;
   invited_by_name?: string | null;
   view_filters: Record<string, string | string[]> | null;

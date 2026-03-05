@@ -95,7 +95,6 @@ export async function GET(request: Request) {
             workspace_ids: workspaceIds,
             permissions: isFirstUser ? FULL_PERMISSIONS : DEFAULT_PERMISSIONS,
             is_active: true,
-            is_deleted: false,
           });
         }
       }

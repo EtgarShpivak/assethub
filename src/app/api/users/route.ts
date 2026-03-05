@@ -23,13 +23,13 @@ export async function GET(request: NextRequest) {
 
   let query = supabase.from('user_profiles').select('*');
 
-  // Filter by status
+  // Filter by status (soft-delete uses role='deleted' since is_deleted column doesn't exist)
   if (filter === 'active') {
-    query = query.eq('is_active', true).or('is_deleted.is.null,is_deleted.eq.false');
+    query = query.eq('is_active', true).neq('role', 'deleted');
   } else if (filter === 'inactive') {
-    query = query.eq('is_active', false).or('is_deleted.is.null,is_deleted.eq.false');
+    query = query.eq('is_active', false).neq('role', 'deleted');
   } else if (filter === 'deleted') {
-    query = query.eq('is_deleted', true);
+    query = query.eq('role', 'deleted');
   }
   // 'all' = no filter, returns everything including deleted
 
@@ -146,16 +146,14 @@ export async function POST(request: NextRequest) {
 
   if (existingUser) {
     // User exists in auth — update/reactivate their profile and generate a new invite link
+    const wasDeleted = existingProfile?.role === 'deleted';
     const upsertData: Record<string, unknown> = {
       id: existingUser.id,
       display_name: existingProfile?.display_name || existingUser.user_metadata?.full_name || email.split('@')[0],
       email,
-      role: existingProfile?.role || 'viewer',
+      role: wasDeleted ? 'viewer' : (existingProfile?.role || 'viewer'),
       permissions: finalPermissions,
       is_active: true,
-      is_deleted: false,
-      deleted_at: null,
-      deleted_by: null,
       invited_by: invited_by || existingProfile?.invited_by || null,
     };
 
@@ -184,7 +182,7 @@ export async function POST(request: NextRequest) {
       entityId: existingUser.id,
       entityName: email,
       userId: currentUser?.id,
-      metadata: { permissions: finalPermissions, re_invited: true, reactivated: existingProfile?.is_deleted === true },
+      metadata: { permissions: finalPermissions, re_invited: true, reactivated: wasDeleted },
     });
 
     return NextResponse.json({ id: existingUser.id, updated: true, invite_link: inviteLink });
@@ -225,9 +223,6 @@ export async function POST(request: NextRequest) {
     permissions: finalPermissions,
     invited_by: invited_by || null,
     is_active: true,
-    is_deleted: false,
-    deleted_at: null,
-    deleted_by: null,
   };
 
   const { error: profileError } = await supabase
@@ -359,14 +354,18 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'לא ניתן למחוק מנהל מערכת. ניתן רק להשבית אותו.' }, { status: 403 });
   }
 
-  // Soft delete: mark as deleted, keep profile for history
+  // Soft delete: set role='deleted' and is_active=false, store deletion metadata in permissions
+  const existingPerms = (targetUser.permissions as Record<string, unknown>) || {};
   const { error: updateError } = await supabase
     .from('user_profiles')
     .update({
-      is_deleted: true,
+      role: 'deleted',
       is_active: false,
-      deleted_at: new Date().toISOString(),
-      deleted_by: currentUser?.id || null,
+      permissions: {
+        ...existingPerms,
+        _deleted_at: new Date().toISOString(),
+        _deleted_by: currentUser?.id || null,
+      },
     })
     .eq('id', userId);
 

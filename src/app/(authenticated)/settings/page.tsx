@@ -398,7 +398,7 @@ export default function SettingsPage() {
 
   // Get user status
   const getUserStatus = (user: UserProfile): { label: string; color: string } => {
-    if (user.is_deleted) return { label: 'נמחק', color: 'bg-red-50 text-red-600' };
+    if (user.role === 'deleted') return { label: 'נמחק', color: 'bg-red-50 text-red-600' };
     if (user.is_active === false) return { label: 'לא פעיל', color: 'bg-ono-orange-light text-ono-orange' };
     return { label: 'פעיל', color: 'bg-ono-green-light text-ono-green-dark' };
   };
@@ -409,7 +409,7 @@ export default function SettingsPage() {
     return PERMISSION_DEFS.filter(d => p[d.key] === true).length;
   };
 
-  const hasNeverLoggedIn = (user: UserProfile) => !user.last_sign_in_at && !user.is_deleted;
+  const hasNeverLoggedIn = (user: UserProfile) => !user.last_sign_in_at && user.role !== 'deleted';
 
   return (
     <div className="space-y-8">
@@ -500,7 +500,7 @@ export default function SettingsPage() {
             ) : (
               displayedUsers.map(user => {
                 const status = getUserStatus(user);
-                const isDeleted = user.is_deleted === true;
+                const isDeleted = user.role === 'deleted';
                 return (
                   <div key={user.id} className={`flex items-center justify-between p-3 border border-[#E8E8E8] rounded-lg ${isDeleted ? 'opacity-40 bg-red-50/30' : user.is_active === false ? 'opacity-60 bg-ono-orange-light/10' : ''}`}>
                     <div className="flex items-center gap-3">
@@ -555,12 +555,15 @@ export default function SettingsPage() {
                               טרם התחבר
                             </span>
                           )}
-                          {isDeleted && user.deleted_at && (
-                            <span className="flex items-center gap-0.5 text-red-500">
-                              <Trash2 className="w-2.5 h-2.5" />
-                              נמחק {new Date(user.deleted_at).toLocaleDateString('he-IL')}
-                            </span>
-                          )}
+                          {isDeleted && (() => {
+                            const deletedAt = (user.permissions as Record<string, unknown>)?._deleted_at;
+                            return deletedAt ? (
+                              <span className="flex items-center gap-0.5 text-red-500">
+                                <Trash2 className="w-2.5 h-2.5" />
+                                נמחק {new Date(deletedAt as string).toLocaleDateString('he-IL')}
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     </div>
