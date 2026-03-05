@@ -31,6 +31,7 @@ import {
   Send,
   Clock,
   Layers,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -143,6 +144,8 @@ export default function AssetLibraryPage() {
   const [filterDateTo, setFilterDateTo] = useState(searchParams.get('date_to') || '');
   const [filterTag, setFilterTag] = useState('');
   const [filterExpiry, setFilterExpiry] = useState(searchParams.get('expiry') || '');
+  const [filterUploadedBy, setFilterUploadedBy] = useState(searchParams.get('uploaded_by') || '');
+  const [uploaders, setUploaders] = useState<{ id: string; name: string }[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeDatePreset, setActiveDatePreset] = useState('');
   const [page, setPage] = useState(1);
@@ -232,6 +235,7 @@ export default function AssetLibraryPage() {
     if (filterDateTo) params.set('date_to', filterDateTo);
     if (filterTag) params.set('tag', filterTag);
     if (filterExpiry) params.set('expiry', filterExpiry);
+    if (filterUploadedBy) params.set('uploaded_by', filterUploadedBy);
     if (searchParams.get('unclassified')) params.set('unclassified', 'true');
     params.set('page', page.toString());
     params.set('sort_by', sortBy);
@@ -242,6 +246,7 @@ export default function AssetLibraryPage() {
       const data = await res.json();
       setAssets(data.assets || []);
       setTotal(data.total || 0);
+      if (data.uploaders) setUploaders(data.uploaders);
     } catch {
       _showError('שגיאה בטעינת חומרים', 'לא ניתן היה לטעון את הנתונים מהשרת.', 'רענן את הדף ונסה שוב. אם הבעיה נמשכת, פנה למנהל המערכת.');
       logClientError('assets-fetch', 'Failed to fetch assets');
@@ -249,7 +254,7 @@ export default function AssetLibraryPage() {
     setLoading(false);
   }, [searchQuery, filterSlugs, filterInitiatives, filterFileTypes, filterPlatforms,
       filterAspectRatios, filterDomainContexts, filterAssetTypes, filterDimensions,
-      filterDateFrom, filterDateTo, filterTag, filterExpiry, page, sortBy, sortDir, searchParams, showToast, _showError]);
+      filterDateFrom, filterDateTo, filterTag, filterExpiry, filterUploadedBy, page, sortBy, sortDir, searchParams, showToast, _showError]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -295,14 +300,14 @@ export default function AssetLibraryPage() {
   const hasActiveFilters = filterSlugs.length > 0 || filterInitiatives.length > 0 ||
     filterFileTypes.length > 0 || filterPlatforms.length > 0 || filterAspectRatios.length > 0 ||
     filterDomainContexts.length > 0 || filterAssetTypes.length > 0 ||
-    filterDimensions || filterDateFrom || filterDateTo || filterTag || filterExpiry || searchQuery;
+    filterDimensions || filterDateFrom || filterDateTo || filterTag || filterExpiry || filterUploadedBy || searchQuery;
 
   const clearFilters = () => {
     setSearchQuery(''); setFilterSlugs([]); setFilterInitiatives([]);
     setFilterFileTypes([]); setFilterPlatforms([]); setFilterAspectRatios([]);
     setFilterDomainContexts([]); setFilterAssetTypes([]);
     setFilterDimensions(''); setFilterDateFrom(''); setFilterDateTo('');
-    setFilterTag(''); setFilterExpiry(''); setActiveDatePreset(''); setPage(1);
+    setFilterTag(''); setFilterExpiry(''); setFilterUploadedBy(''); setActiveDatePreset(''); setPage(1);
   };
 
   const getCurrentFilters = () => ({
@@ -822,7 +827,10 @@ export default function AssetLibraryPage() {
                       </Badge>
                     )}
                   </div>
-                  <p className="text-[10px] text-ono-gray mt-1">{new Date(asset.upload_date).toLocaleDateString('he-IL')}</p>
+                  <p className="text-[10px] text-ono-gray mt-1">
+                    {new Date(asset.upload_date).toLocaleDateString('he-IL')}
+                    {asset.uploaded_by_name && <span className="text-ono-gray/70"> · {asset.uploaded_by_name}</span>}
+                  </p>
                 </div>
               </div>
             ))}
@@ -841,6 +849,7 @@ export default function AssetLibraryPage() {
                   <th className="p-3 text-right font-bold text-ono-gray-dark">סוג חומר</th>
                   <th className="p-3 text-right font-bold text-ono-gray-dark">פלטפורמות</th>
                   <th className="p-3 text-right font-bold text-ono-gray-dark cursor-pointer" onClick={() => toggleSort('upload_date')}>תאריך {sortBy === 'upload_date' && (sortDir === 'desc' ? '↓' : '↑')}</th>
+                  <th className="p-3 text-right font-bold text-ono-gray-dark">הועלה ע&quot;י</th>
                   <th className="p-3 text-right font-bold text-ono-gray-dark">סלאג</th>
                 </tr>
               </thead>
@@ -861,6 +870,7 @@ export default function AssetLibraryPage() {
                       </Badge>
                     )}</div></td>
                     <td className="p-3 text-ono-gray text-xs">{new Date(asset.upload_date).toLocaleDateString('he-IL')}</td>
+                    <td className="p-3 text-ono-gray text-xs">{asset.uploaded_by_name || '—'}</td>
                     <td className="p-3 text-ono-gray text-xs">{(asset as Asset & { slugs?: { display_name: string } }).slugs?.display_name || '—'}</td>
                   </tr>
                 ))}
@@ -948,6 +958,17 @@ export default function AssetLibraryPage() {
               <option value="expiring_soon">פוקע ב-30 יום</option>
             </select>
           </div>
+
+          {/* Uploader filter */}
+          {uploaders.length > 0 && (
+            <div>
+              <Label className="text-xs mb-1.5 flex items-center gap-1"><Users className="w-3 h-3" /> הועלה ע&quot;י</Label>
+              <select value={filterUploadedBy} onChange={e => { setFilterUploadedBy(e.target.value); setPage(1); }} className="w-full border border-[#E8E8E8] rounded-md p-1.5 text-xs">
+                <option value="">כל המשתמשים</option>
+                {uploaders.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -1066,6 +1087,7 @@ export default function AssetLibraryPage() {
                       <div><span className="text-ono-gray">סוג קובץ:</span><span className="mr-2 text-ono-gray-dark">{FILE_TYPES.find(f => f.value === detailAsset.file_type)?.label}</span></div>
                       <div><span className="text-ono-gray">סוג תוכן:</span><span className="mr-2 text-ono-gray-dark">{DOMAIN_CONTEXTS.find(d => d.value === detailAsset.domain_context)?.label || '—'}</span></div>
                       <div><span className="text-ono-gray">תאריך:</span><span className="mr-2 text-ono-gray-dark">{new Date(detailAsset.upload_date).toLocaleDateString('he-IL')}</span></div>
+                      <div><span className="text-ono-gray">הועלה ע&quot;י:</span><span className="mr-2 text-ono-gray-dark">{detailAsset.uploaded_by_name || '—'}</span></div>
                       <div><span className="text-ono-gray">תגיות:</span><span className="mr-2 text-ono-gray-dark">{detailAsset.tags?.join(', ') || '—'}</span></div>
                       {detailAsset.license_notes && <div className="col-span-2"><span className="text-ono-gray">רישיון:</span><span className="mr-2 text-ono-gray-dark">{detailAsset.license_notes}</span></div>}
                     </div>

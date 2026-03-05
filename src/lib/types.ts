@@ -60,6 +60,7 @@ export interface Asset {
   drive_view_url: string | null;
   upload_date: string;
   uploaded_by: string | null;
+  uploaded_by_name?: string | null;
   tags: string[] | null;
   is_archived: boolean;
   notes: string | null;

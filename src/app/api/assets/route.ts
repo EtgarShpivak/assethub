@@ -188,6 +188,12 @@ export async function GET(request: NextRequest) {
     query = query.or('platforms.is.null,platforms.eq.{}');
   }
 
+  // Uploaded-by filter — supports single user ID
+  const uploadedBy = searchParams.get('uploaded_by');
+  if (uploadedBy) {
+    query = query.eq('uploaded_by', uploadedBy);
+  }
+
   // Expiry filter
   const expiry = searchParams.get('expiry');
   if (expiry === 'valid') {
@@ -219,5 +225,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'שגיאה בטעינת חומרים' }, { status: 500 });
   }
 
-  return NextResponse.json({ assets: data, total: count });
+  const assets = data || [];
+
+  // Enrich assets with uploader names (batch lookup — avoids N+1)
+  const uploaderIds = Array.from(new Set(assets.map(a => a.uploaded_by).filter(Boolean))) as string[];
+  let uploaderMap = new Map<string, string>();
+  if (uploaderIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('id, display_name, email')
+      .in('id', uploaderIds);
+
+    if (profiles) {
+      uploaderMap = new Map(
+        profiles.map(p => [p.id, p.display_name || p.email || 'משתמש'])
+      );
+    }
+  }
+
+  const enrichedAssets = assets.map(asset => ({
+    ...asset,
+    uploaded_by_name: asset.uploaded_by ? uploaderMap.get(asset.uploaded_by) || null : null,
+  }));
+
+  // Build unique uploaders list for filter dropdown
+  const uploaders = Array.from(uploaderMap.entries()).map(([id, name]) => ({ id, name }));
+
+  return NextResponse.json({ assets: enrichedAssets, total: count, uploaders });
 }
