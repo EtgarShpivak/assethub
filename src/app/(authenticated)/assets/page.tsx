@@ -681,7 +681,7 @@ export default function AssetLibraryPage() {
         <div className="flex gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray" />
-            <Input className="pr-10" placeholder="חיפוש לפי שם קובץ, הערות או תגיות..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <Input className="pr-10" placeholder="חיפוש לפי שם קובץ, סלאג, קמפיין או הערות..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
           {/* Slug quick filter */}
           <select

@@ -154,15 +154,35 @@ export async function GET(request: NextRequest) {
     query = query.lte('upload_date', dateTo + 'T23:59:59.999Z');
   }
 
-  // Search — includes filename, notes, tags, stored_filename
+  // Search — includes filename, notes, stored_filename, slug name, initiative name
   const search = searchParams.get('search');
   if (search) {
     // Sanitize search input — remove PostgREST special chars to prevent filter injection
     const sanitized = search.replace(/[().,\\]/g, '').trim().slice(0, 200);
     if (sanitized) {
-      query = query.or(
-        `original_filename.ilike.%${sanitized}%,notes.ilike.%${sanitized}%,stored_filename.ilike.%${sanitized}%`
-      );
+      // Find slugs and initiatives matching the search term
+      const [slugMatch, initMatch] = await Promise.all([
+        supabase.from('slugs').select('id').or(`display_name.ilike.%${sanitized}%,slug.ilike.%${sanitized}%`),
+        supabase.from('initiatives').select('id').or(`name.ilike.%${sanitized}%,short_code.ilike.%${sanitized}%`),
+      ]);
+
+      const matchedSlugIds = (slugMatch.data || []).map(s => s.id);
+      const matchedInitIds = (initMatch.data || []).map(i => i.id);
+
+      // Build OR conditions: text fields + matching slug/initiative IDs
+      const orParts = [
+        `original_filename.ilike.%${sanitized}%`,
+        `notes.ilike.%${sanitized}%`,
+        `stored_filename.ilike.%${sanitized}%`,
+      ];
+      if (matchedSlugIds.length > 0) {
+        orParts.push(`slug_id.in.(${matchedSlugIds.join(',')})`);
+      }
+      if (matchedInitIds.length > 0) {
+        orParts.push(`initiative_id.in.(${matchedInitIds.join(',')})`);
+      }
+
+      query = query.or(orParts.join(','));
     }
   }
 
