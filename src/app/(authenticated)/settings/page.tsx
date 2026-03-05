@@ -435,7 +435,18 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          {/* Filter tabs + sort + search */}
+          {/* Search bar */}
+          <div className="relative mb-3">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none" />
+            <Input
+              placeholder="חיפוש לפי שם או אימייל..."
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+              className="pr-9 text-right"
+            />
+          </div>
+
+          {/* Filter tabs + sort */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
             {/* Filter tabs */}
             <div className="flex gap-1 bg-ono-gray-light rounded-lg p-0.5">
@@ -478,16 +489,12 @@ export default function SettingsPage() {
               <ArrowUpDown className="w-3.5 h-3.5 text-ono-gray" />
             </button>
 
-            {/* Search */}
-            <div className="relative flex-1 min-w-[150px]">
-              <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ono-gray" />
-              <Input
-                placeholder="חיפוש משתמש..."
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-                className="h-7 pr-7 text-xs"
-              />
-            </div>
+            {/* Search result count */}
+            {userSearch && (
+              <span className="text-xs text-ono-gray mr-auto">
+                {displayedUsers.length} תוצאות
+              </span>
+            )}
           </div>
 
           <div className="space-y-2">

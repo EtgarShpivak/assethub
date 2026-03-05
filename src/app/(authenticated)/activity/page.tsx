@@ -321,10 +321,17 @@ export default function UnifiedActivityLogPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Reset page when filters change
+  // Reset page and conflicting filters when tab changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, debouncedSearch, filterAction, filterEntityType, filterUserId, dateFrom, dateTo]);
+    // Tabs already define action filters — clear action dropdown to prevent conflict
+    setFilterAction('');
+  }, [activeTab]);
+
+  // Reset page when other filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, filterAction, filterEntityType, filterUserId, dateFrom, dateTo]);
 
   // Fetch log entries
   const fetchEntries = useCallback(async () => {
@@ -355,6 +362,7 @@ export default function UnifiedActivityLogPage() {
     } catch {
       setEntries([]);
       setTotal(0);
+      setStats({ totalEvents: 0, errorCount: 0, todayCount: 0, uploadCount: 0, downloadCount: 0 });
     }
     setLoading(false);
   }, [currentPage, activeTab, debouncedSearch, filterAction, filterEntityType, filterUserId, dateFrom, dateTo]);

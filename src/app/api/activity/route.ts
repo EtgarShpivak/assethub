@@ -41,7 +41,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Additional filters (on top of tab)
-    if (action) query = query.eq('action', action);
+    // Skip action filter if tab already defines one (prevents double .eq('action', ...) conflict)
+    const tabDefinesAction = ['uploads', 'searches', 'errors'].includes(tab);
+    if (action && !tabDefinesAction) query = query.eq('action', action);
     if (entityType) query = query.eq('entity_type', entityType);
     if (entityId) query = query.eq('entity_id', entityId);
     if (userId) query = query.eq('user_id', userId);
