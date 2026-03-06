@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search');
   if (search) {
     // Sanitize search input — remove PostgREST special chars to prevent filter injection
-    const sanitized = search.replace(/[().,\\]/g, '').trim().slice(0, 200);
+    const sanitized = search.replace(/[(),\\]/g, '').trim().slice(0, 200);
     if (sanitized) {
       // Find slugs and initiatives matching the search term
       const [slugMatch, initMatch] = await Promise.all([

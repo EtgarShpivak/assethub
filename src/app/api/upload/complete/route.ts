@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
   const {
     files, slug_id, workspace_id, initiative_id,
     domain_context, platforms, tags, upload_date, asset_type, expires_at,
+    parent_asset_id, version,
   } = body as {
     files: FileCompleteInput[];
     slug_id: string;
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest) {
     upload_date?: string;
     asset_type?: string;
     expires_at?: string;
+    parent_asset_id?: string;
+    version?: number;
   };
 
   if (!slug_id || !workspace_id || !files?.length) {
@@ -142,6 +145,8 @@ export async function POST(request: NextRequest) {
           tags: tags || null,
           file_hash: fileHash,
           expires_at: expires_at || null,
+          parent_asset_id: parent_asset_id || null,
+          version: version || 1,
         })
         .select()
         .single();

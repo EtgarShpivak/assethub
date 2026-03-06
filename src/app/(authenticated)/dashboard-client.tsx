@@ -112,6 +112,7 @@ export function DashboardClient({
   const [selectedSlug, setSelectedSlug] = useState<string>('all');
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [recentDownloads, setRecentDownloads] = useState<{ entity_name: string; entity_id: string; created_at: string }[]>([]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -125,6 +126,14 @@ export function DashboardClient({
   }, []);
 
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
+
+  // Fetch my recent downloads
+  useEffect(() => {
+    fetch('/api/activity?tab=all&action=download&limit=8&my_only=true')
+      .then(r => r.ok ? r.json() : { entries: [] })
+      .then(data => setRecentDownloads(data.entries || []))
+      .catch(() => {});
+  }, []);
 
   // Filter assets and initiatives by selected slug
   const filteredAssets = selectedSlug === 'all'
@@ -295,7 +304,7 @@ export function DashboardClient({
               {filteredAssets.slice(0, 9).map((asset) => (
                 <Link
                   key={asset.id}
-                  href={`/assets?search=${encodeURIComponent(asset.original_filename)}`}
+                  href={`/assets?id=${asset.id}`}
                   className="border border-[#E8E8E8] rounded-lg p-3 hover:border-ono-green transition-colors block"
                 >
                   <div className="aspect-square bg-ono-gray-light rounded-md flex items-center justify-center mb-2 overflow-hidden">
@@ -369,6 +378,35 @@ export function DashboardClient({
           )}
         </div>
       </div>
+
+      {/* My Recent Downloads */}
+      {recentDownloads.length > 0 && (
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-ono-gray-dark flex items-center gap-2">
+              <Download className="w-5 h-5 text-ono-green" />
+              ההורדות האחרונות שלי
+            </h2>
+            <Link href="/activity" className="text-sm text-ono-green hover:text-ono-green-dark">
+              יומן מלא
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {recentDownloads.map((dl, i) => (
+              <Link
+                key={i}
+                href={dl.entity_id ? `/assets?id=${dl.entity_id}` : '#'}
+                className="border border-[#E8E8E8] rounded-lg p-3 hover:border-ono-green transition-colors block"
+              >
+                <p className="text-xs text-ono-gray-dark font-medium truncate">{dl.entity_name || 'קובץ'}</p>
+                <p className="text-[10px] text-ono-gray mt-1">
+                  {new Date(dl.created_at).toLocaleDateString('he-IL')} {new Date(dl.created_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* User Guide Banner */}
       <Link

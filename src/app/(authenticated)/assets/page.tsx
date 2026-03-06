@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   FolderOpen,
   Grid3X3,
@@ -32,6 +33,8 @@ import {
   Clock,
   Layers,
   Users,
+  Star,
+  Upload as UploadIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -254,7 +257,7 @@ export default function AssetLibraryPage() {
     setLoading(false);
   }, [searchQuery, filterSlugs, filterInitiatives, filterFileTypes, filterPlatforms,
       filterAspectRatios, filterDomainContexts, filterAssetTypes, filterDimensions,
-      filterDateFrom, filterDateTo, filterTag, filterExpiry, filterUploadedBy, page, sortBy, sortDir, searchParams, showToast, _showError]);
+      filterDateFrom, filterDateTo, filterTag, filterExpiry, filterUploadedBy, page, sortBy, sortDir, searchParams, _showError]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -288,6 +291,62 @@ export default function AssetLibraryPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailAsset]);
+
+  // Handle direct asset link (?id=ASSET_ID) — open detail modal
+  const directIdFetched = useRef<string | null>(null);
+  useEffect(() => {
+    const directId = searchParams.get('id');
+    if (!directId || detailAsset?.id === directId) return;
+    if (directIdFetched.current === directId) return; // already attempted
+    // Check if already loaded
+    const found = assets.find(a => a.id === directId);
+    if (found) { setDetailAsset(found); directIdFetched.current = directId; return; }
+    // Fetch directly if not in current page
+    if (!loading) {
+      directIdFetched.current = directId;
+      fetch(`/api/assets/${directId}`).then(r => r.ok ? r.json() : null).then(data => {
+        if (data) setDetailAsset(data);
+        else showToast('החומר המבוקש לא נמצא', 'error');
+      }).catch(() => { showToast('שגיאה בטעינת החומר', 'error'); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, assets, loading]);
+
+  // Favorites
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(searchParams.get('favorites') === 'true');
+
+  useEffect(() => {
+    fetch('/api/favorites').then(r => r.ok ? r.json() : []).then(ids => {
+      if (Array.isArray(ids)) setFavorites(new Set(ids));
+    }).catch(() => {});
+  }, []);
+
+  const toggleFavorite = async (assetId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const wasFav = favorites.has(assetId);
+    // Optimistic update
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (wasFav) next.delete(assetId); else next.add(assetId);
+      return next;
+    });
+    try {
+      const res = await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_id: assetId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Revert on error
+      setFavorites(prev => {
+        const next = new Set(prev);
+        if (wasFav) next.add(assetId); else next.delete(assetId);
+        return next;
+      });
+    }
+  };
 
   const toggleAssetSelection = (id: string) => {
     setSelectedAssets(prev => {
@@ -632,6 +691,90 @@ export default function AssetLibraryPage() {
     } catch { showToast('שגיאה בהוספת הערה', 'error'); }
   };
 
+  // ===== Version Upload =====
+  const [versionUploading, setVersionUploading] = useState(false);
+  const versionInputRef = useRef<HTMLInputElement>(null);
+
+  const handleVersionUpload = async (file: File) => {
+    if (!detailAsset) return;
+    setVersionUploading(true);
+    try {
+      // Get current asset's max version
+      const currentVersion = detailAsset.version || 1;
+      const parentId = detailAsset.parent_asset_id || detailAsset.id;
+
+      // Use prepare → upload → complete flow
+      const prepareRes = await fetch('/api/upload/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files: [{ name: file.name, size: file.size, type: file.type }],
+          slug_id: detailAsset.slug_id,
+          workspace_id: detailAsset.workspace_id,
+          initiative_id: detailAsset.initiative_id || undefined,
+          upload_date: new Date().toISOString().split('T')[0],
+        }),
+      });
+
+      if (!prepareRes.ok) { showToast('שגיאה בהכנת ההעלאה', 'error'); setVersionUploading(false); return; }
+      const prepareData = await prepareRes.json();
+      const prepared = prepareData.files?.[0];
+      if (!prepared) { showToast('שגיאה בהכנת ההעלאה', 'error'); setVersionUploading(false); return; }
+
+      // Upload via XHR
+      const uploadOk = await new Promise<boolean>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', prepared.signedUrl);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
+        xhr.onerror = () => resolve(false);
+        xhr.send(file);
+      });
+
+      if (!uploadOk) { showToast('שגיאה בהעלאת הקובץ', 'error'); setVersionUploading(false); return; }
+
+      // Complete — create DB record
+      const completeRes = await fetch('/api/upload/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files: [{
+            originalName: file.name,
+            storagePath: prepared.storagePath,
+            size: file.size,
+            type: file.type,
+            fileType: prepared.fileType,
+          }],
+          slug_id: detailAsset.slug_id,
+          workspace_id: detailAsset.workspace_id,
+          initiative_id: detailAsset.initiative_id || undefined,
+          domain_context: detailAsset.domain_context || undefined,
+          platforms: detailAsset.platforms || undefined,
+          tags: detailAsset.tags || undefined,
+          upload_date: new Date().toISOString().split('T')[0],
+          asset_type: detailAsset.asset_type,
+          parent_asset_id: parentId,
+          version: currentVersion + 1,
+        }),
+      });
+
+      if (completeRes.ok) {
+        const completeData = await completeRes.json();
+        showToast(`גרסה ${currentVersion + 1} הועלתה בהצלחה`, 'success');
+        fetchAssets();
+        // Show the new version in the detail modal instead of closing
+        if (completeData.uploaded?.[0]) {
+          setDetailAsset(completeData.uploaded[0]);
+        }
+      } else {
+        showToast('שגיאה ביצירת הרשומה', 'error');
+      }
+    } catch {
+      showToast('שגיאה בהעלאת גרסה חדשה', 'error');
+    }
+    setVersionUploading(false);
+  };
+
   const toggleSort = (field: string) => {
     if (sortBy === field) setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
     else { setSortBy(field); setSortDir('desc'); }
@@ -656,6 +799,12 @@ export default function AssetLibraryPage() {
             <InfoTooltip text="כאן מוצגים כל החומרים השיווקיים. ניתן לסנן, לחפש, להוריד ולשתף. לחצו על חומר לפרטים מלאים." size="md" />
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/upload">
+              <Button size="sm" className="bg-ono-green hover:bg-ono-green-dark text-white">
+                <UploadIcon className="w-4 h-4" />
+                <span className="mr-1 text-xs">העלאת חומרים</span>
+              </Button>
+            </Link>
             {selectedAssets.size > 0 && (
               <Button variant="outline" size="sm" onClick={() => { setShowShareDialog(true); setShareLink(''); }} title="שתף נבחרים">
                 <Share2 className="w-4 h-4" />
@@ -671,6 +820,16 @@ export default function AssetLibraryPage() {
             <Button variant="outline" size="sm" onClick={() => toggleSort('upload_date')} className={sortBy === 'upload_date' ? 'border-ono-green text-ono-green' : ''}>
               <ArrowUpDown className="w-3 h-3" />
               <span className="mr-1 text-xs">תאריך {sortDir === 'desc' ? '↓' : '↑'}</span>
+            </Button>
+            <Button
+              variant={showFavoritesOnly ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowFavoritesOnly(prev => !prev)}
+              className={showFavoritesOnly ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}
+              title="הצג מועדפים בלבד"
+            >
+              <Star className={`w-4 h-4 ${showFavoritesOnly ? 'fill-current' : ''}`} />
+              {favorites.size > 0 && <span className="mr-1 text-xs">{favorites.size}</span>}
             </Button>
             <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''}><Grid3X3 className="w-4 h-4" /></Button>
             <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''}><List className="w-4 h-4" /></Button>
@@ -771,7 +930,7 @@ export default function AssetLibraryPage() {
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {assets.map(asset => (
+            {(showFavoritesOnly ? assets.filter(a => favorites.has(a.id)) : assets).map(asset => (
               <div key={asset.id} className={`group bg-white border rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden cursor-pointer transition-all hover:border-ono-green ${selectedAssets.has(asset.id) ? 'border-ono-green ring-2 ring-ono-green/20' : 'border-[#E8E8E8]'}`}>
                 <div className="relative">
                   <div className="absolute top-2 right-2 z-10" onClick={(e) => { e.stopPropagation(); toggleAssetSelection(asset.id); }}>
@@ -784,6 +943,14 @@ export default function AssetLibraryPage() {
                       <Badge className="bg-black/60 text-white text-[9px] px-1 py-0 border-0">{asset.aspect_ratio}</Badge>
                     </div>
                   )}
+                  {/* Favorite button */}
+                  <button
+                    className={`absolute bottom-2 right-2 z-10 w-7 h-7 rounded-full border flex items-center justify-center transition-all ${favorites.has(asset.id) ? 'bg-yellow-400 border-yellow-500 text-white opacity-100' : 'bg-white/90 border-[#E8E8E8] opacity-0 group-hover:opacity-100 hover:bg-yellow-400 hover:text-white hover:border-yellow-500'}`}
+                    onClick={(e) => toggleFavorite(asset.id, e)}
+                    title={favorites.has(asset.id) ? 'הסר ממועדפים' : 'הוסף למועדפים'}
+                  >
+                    <Star className={`w-3.5 h-3.5 ${favorites.has(asset.id) ? 'fill-current' : ''}`} />
+                  </button>
                   {/* Quick download button */}
                   <button
                     className="absolute bottom-2 left-2 z-10 w-7 h-7 rounded-full bg-white/90 border border-[#E8E8E8] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-ono-green hover:text-white hover:border-ono-green"
@@ -854,7 +1021,7 @@ export default function AssetLibraryPage() {
                 </tr>
               </thead>
               <tbody>
-                {assets.map((asset, i) => (
+                {(showFavoritesOnly ? assets.filter(a => favorites.has(a.id)) : assets).map((asset, i) => (
                   <tr key={asset.id} className={`border-b border-[#E8E8E8] hover:bg-ono-gray-light/50 cursor-pointer ${i % 2 === 1 ? 'bg-ono-gray-light/30' : ''}`} onClick={() => setDetailAsset(asset)}>
                     <td className="p-3" onClick={e => e.stopPropagation()}><Checkbox checked={selectedAssets.has(asset.id)} onCheckedChange={() => toggleAssetSelection(asset.id)} /></td>
                     <td className="p-3"><div className="flex items-center gap-2"><FileTypeIcon type={asset.file_type} size="sm" /><span className="text-ono-gray-dark truncate max-w-[200px]">{asset.stored_filename || asset.original_filename}</span></div></td>
@@ -879,8 +1046,8 @@ export default function AssetLibraryPage() {
           </div>
         )}
 
-        {/* Pagination */}
-        {total > 48 && (
+        {/* Pagination — hidden when favorites filter active (client-side filtering) */}
+        {total > 48 && !showFavoritesOnly && (
           <div className="flex items-center justify-center gap-2 py-4">
             <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>הקודם</Button>
             <span className="text-sm text-ono-gray">עמוד {page} מתוך {Math.ceil(total / 48)}</span>
@@ -1134,12 +1301,41 @@ export default function AssetLibraryPage() {
                 {/* Actions */}
                 <div className="flex gap-2 pt-2 border-t border-[#E8E8E8]">
                   <Button className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={() => handleDownloadSingle(detailAsset)}><Download className="w-4 h-4 ml-2" />הורד</Button>
+                  <Button
+                    variant="outline"
+                    className={favorites.has(detailAsset.id) ? 'bg-yellow-50 border-yellow-400 text-yellow-600' : ''}
+                    onClick={() => toggleFavorite(detailAsset.id)}
+                  >
+                    <Star className={`w-4 h-4 ml-2 ${favorites.has(detailAsset.id) ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                    {favorites.has(detailAsset.id) ? 'במועדפים' : 'הוסף למועדפים'}
+                  </Button>
                   <Button variant="outline" onClick={() => {
                     setSelectedAssets(new Set([detailAsset.id]));
                     setShowShareDialog(true);
                     setShareLink('');
                     setDetailAsset(null);
                   }}><Share2 className="w-4 h-4 ml-2" />שתף</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => versionInputRef.current?.click()}
+                    disabled={versionUploading}
+                  >
+                    {versionUploading
+                      ? <div className="w-4 h-4 border-2 border-ono-green border-t-transparent rounded-full animate-spin ml-2" />
+                      : <Layers className="w-4 h-4 ml-2" />
+                    }
+                    {versionUploading ? 'מעלה...' : 'העלה גרסה חדשה'}
+                  </Button>
+                  <input
+                    ref={versionInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleVersionUpload(file);
+                      e.target.value = '';
+                    }}
+                  />
                   <Button variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50" onClick={() => {
                     setShowArchiveConfirm(detailAsset);
                   }}><Archive className="w-4 h-4 ml-2" />העבר לארכיון</Button>
@@ -1240,14 +1436,17 @@ export default function AssetLibraryPage() {
             <Button variant="outline" onClick={() => setShowArchiveConfirm(null)}>ביטול</Button>
             <Button className="bg-orange-500 hover:bg-orange-600 text-white" onClick={async () => {
               if (!showArchiveConfirm) return;
-              await fetch(`/api/assets/${showArchiveConfirm.id}`, { method: 'DELETE' });
-              fetch('/api/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'archive', entity_type: 'asset', entity_id: showArchiveConfirm.id, entity_name: showArchiveConfirm.original_filename })
-              }).catch(() => {});
-              setShowArchiveConfirm(null);
-              setDetailAsset(null);
-              fetchAssets();
-              showToast('החומר הועבר לארכיון', 'success');
+              try {
+                const res = await fetch(`/api/assets/${showArchiveConfirm.id}`, { method: 'DELETE' });
+                if (!res.ok) { showToast('שגיאה בהעברה לארכיון', 'error'); return; }
+                fetch('/api/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'archive', entity_type: 'asset', entity_id: showArchiveConfirm.id, entity_name: showArchiveConfirm.original_filename })
+                }).catch(() => {});
+                setShowArchiveConfirm(null);
+                setDetailAsset(null);
+                fetchAssets();
+                showToast('החומר הועבר לארכיון', 'success');
+              } catch { showToast('שגיאה בהעברה לארכיון', 'error'); }
             }}>העבר לארכיון</Button>
           </DialogFooter>
         </DialogContent>

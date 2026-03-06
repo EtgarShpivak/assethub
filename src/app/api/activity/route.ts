@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
   const dateFrom = searchParams.get('date_from');
   const dateTo = searchParams.get('date_to');
   const search = searchParams.get('search');
+  const myOnly = searchParams.get('my_only') === 'true';
 
   try {
     let query = supabase
@@ -46,7 +47,8 @@ export async function GET(request: NextRequest) {
     if (action && !tabDefinesAction) query = query.eq('action', action);
     if (entityType) query = query.eq('entity_type', entityType);
     if (entityId) query = query.eq('entity_id', entityId);
-    if (userId) query = query.eq('user_id', userId);
+    if (myOnly) query = query.eq('user_id', user.id);
+    else if (userId) query = query.eq('user_id', userId);
     if (dateFrom) query = query.gte('created_at', dateFrom);
     if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59.999Z');
     if (search) query = query.or(`entity_name.ilike.%${search}%,user_name.ilike.%${search}%`);

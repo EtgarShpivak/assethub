@@ -17,6 +17,7 @@ import {
   ScrollText,
   ChevronDown,
   Wrench,
+  Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 const navEntries: NavEntry[] = [
   { href: '/', label: 'דשבורד', icon: LayoutDashboard },
   { href: '/assets', label: 'ספריית חומרים', icon: FolderOpen },
+  { href: '/assets?favorites=true', label: 'מועדפים', icon: Star },
   { href: '/upload', label: 'העלאת חומרים', icon: Upload },
   {
     label: 'ניהול מערכת',
