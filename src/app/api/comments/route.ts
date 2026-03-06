@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createServiceRoleClient();
-  const { asset_id, content } = await request.json();
+  const { asset_id, content, parent_comment_id } = await request.json();
 
   if (!asset_id || !content?.trim()) {
     return NextResponse.json({ error: 'asset_id and content required' }, { status: 400 });
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       user_name: userName,
       content: content.trim(),
+      parent_comment_id: parent_comment_id || null,
     })
     .select()
     .single();

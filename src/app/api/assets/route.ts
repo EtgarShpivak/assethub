@@ -18,11 +18,35 @@ export async function GET(request: NextRequest) {
   const sortBy = SORT_ALLOWLIST.includes(rawSortBy) ? rawSortBy : 'upload_date';
   const sortDir = searchParams.get('sort_dir') === 'asc' ? true : false;
 
+  // Similar assets mode — returns scored matches instead of normal listing
+  const similarTo = searchParams.get('similar_to');
+  if (similarTo) {
+    return handleSimilarAssets(supabase, similarTo, parseInt(searchParams.get('limit') || '6'));
+  }
+
+  // Server-side favorites filtering
+  const favoritesOnly = searchParams.get('favorites_only') === 'true';
+  let favoriteIds: string[] = [];
+  if (favoritesOnly) {
+    const { data: favData } = await supabase
+      .from('favorites')
+      .select('asset_id')
+      .eq('user_id', user.id);
+    favoriteIds = (favData || []).map(f => f.asset_id);
+    if (favoriteIds.length === 0) {
+      return NextResponse.json({ assets: [], total: 0, uploaders: [] });
+    }
+  }
+
   let query = supabase
     .from('assets')
     .select('*, slugs(slug, display_name), initiatives(name, short_code)', { count: 'exact' })
     .eq('is_archived', false)
     .order(sortBy, { ascending: sortDir });
+
+  if (favoritesOnly && favoriteIds.length > 0) {
+    query = query.in('id', favoriteIds);
+  }
 
   // Slug filter — supports multiple IDs (comma-separated)
   const slugId = searchParams.get('slug_id');
@@ -169,11 +193,12 @@ export async function GET(request: NextRequest) {
       const matchedSlugIds = (slugMatch.data || []).map(s => s.id);
       const matchedInitIds = (initMatch.data || []).map(i => i.id);
 
-      // Build OR conditions: text fields + matching slug/initiative IDs
+      // Build OR conditions: text fields + matching slug/initiative IDs + PDF text content
       const orParts = [
         `original_filename.ilike.%${sanitized}%`,
         `notes.ilike.%${sanitized}%`,
         `stored_filename.ilike.%${sanitized}%`,
+        `text_content.ilike.%${sanitized}%`,
       ];
       if (matchedSlugIds.length > 0) {
         orParts.push(`slug_id.in.(${matchedSlugIds.join(',')})`);
@@ -272,4 +297,59 @@ export async function GET(request: NextRequest) {
   const uploaders = Array.from(uploaderMap.entries()).map(([id, name]) => ({ id, name }));
 
   return NextResponse.json({ assets: enrichedAssets, total: count, uploaders });
+}
+
+// Similar assets — metadata-based matching
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleSimilarAssets(supabase: any, assetId: string, limit: number) {
+  // Fetch the source asset
+  const { data: source } = await supabase
+    .from('assets')
+    .select('*')
+    .eq('id', assetId)
+    .single();
+
+  if (!source) {
+    return NextResponse.json({ assets: [], total: 0 });
+  }
+
+  // Fetch potential matches (same workspace, not archived, not the same asset)
+  const { data: candidates } = await supabase
+    .from('assets')
+    .select('*, slugs(slug, display_name), initiatives(name, short_code)')
+    .eq('is_archived', false)
+    .neq('id', assetId)
+    .limit(200);
+
+  if (!candidates || candidates.length === 0) {
+    return NextResponse.json({ assets: [], total: 0 });
+  }
+
+  // Score each candidate
+  const scored = candidates.map((c: Record<string, unknown>) => {
+    let score = 0;
+    if (c.slug_id === source.slug_id && source.slug_id) score += 3;
+    if (c.initiative_id === source.initiative_id && source.initiative_id) score += 3;
+    if (c.file_type === source.file_type) score += 2;
+    if (c.aspect_ratio === source.aspect_ratio && source.aspect_ratio) score += 2;
+    if (c.domain_context === source.domain_context && source.domain_context) score += 1;
+    // Tag overlap
+    const sTags = (source.tags || []) as string[];
+    const cTags = (c.tags || []) as string[];
+    const overlap = sTags.filter((t: string) => cTags.includes(t)).length;
+    score += overlap * 2;
+    // Platform overlap
+    const sPlats = (source.platforms || []) as string[];
+    const cPlats = (c.platforms || []) as string[];
+    const pOverlap = sPlats.filter((p: string) => cPlats.includes(p)).length;
+    score += pOverlap;
+
+    return { ...c, _score: score };
+  });
+
+  // Sort by score desc and take top N
+  scored.sort((a: { _score: number }, b: { _score: number }) => b._score - a._score);
+  const topMatches = scored.filter((s: { _score: number }) => s._score > 0).slice(0, limit);
+
+  return NextResponse.json({ assets: topMatches, total: topMatches.length });
 }

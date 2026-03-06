@@ -18,6 +18,8 @@ import {
   ChevronDown,
   Wrench,
   Star,
+  UserCircle,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +47,7 @@ const navEntries: NavEntry[] = [
   { href: '/', label: 'דשבורד', icon: LayoutDashboard },
   { href: '/assets', label: 'ספריית חומרים', icon: FolderOpen },
   { href: '/assets?favorites=true', label: 'מועדפים', icon: Star },
+  { href: '/assets?my=true', label: 'הנכסים שלי', icon: UserCircle },
   { href: '/upload', label: 'העלאת חומרים', icon: Upload },
   {
     label: 'ניהול מערכת',
@@ -63,6 +66,7 @@ const navEntries: NavEntry[] = [
     children: [
       { href: '/settings', label: 'משתמשים והרשאות', icon: Settings },
       { href: '/activity', label: 'יומן פעילות', icon: ScrollText },
+      { href: '/reports', label: 'דוחות', icon: BarChart3 },
     ],
   },
   { href: '/help', label: 'עזרה ותמיכה', icon: HelpCircle },

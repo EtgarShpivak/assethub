@@ -14,6 +14,7 @@ import {
   Plus,
   Globe,
   Newspaper,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +78,7 @@ export default function UploadPage() {
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState('');
+  const [autoFavorite, setAutoFavorite] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, 'pending' | 'uploading' | 'done' | 'error'>>({});
@@ -383,6 +385,22 @@ export default function UploadPage() {
         setUploadProgress({ ...progress });
         await logClientError('upload-direct', err instanceof Error ? err.message : 'Network error');
       }
+    }
+
+    // Auto-favorite uploaded assets
+    if (autoFavorite && totalUploaded > 0) {
+      try {
+        const recentRes = await fetch(`/api/assets?slug_id=${selectedSlug}&sort_by=upload_date&sort_dir=desc&limit=${totalUploaded}`);
+        const recentData = await recentRes.json();
+        const recentAssets = recentData.assets || [];
+        for (const a of recentAssets) {
+          await fetch('/api/favorites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ asset_id: a.id }),
+          });
+        }
+      } catch { /* ignore favorites error */ }
     }
 
     // Show results
@@ -766,6 +784,13 @@ export default function UploadPage() {
               </p>
             </div>
           )}
+
+          {/* Auto-favorite option */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox checked={autoFavorite} onCheckedChange={v => setAutoFavorite(!!v)} className="h-4 w-4" />
+            <Star className="w-4 h-4 text-yellow-500" />
+            <span className="text-sm text-ono-gray-dark">הוסף אוטומטית למועדפים לאחר העלאה</span>
+          </label>
 
           <Button
             onClick={handleUpload}

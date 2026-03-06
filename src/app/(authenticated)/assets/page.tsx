@@ -28,8 +28,6 @@ import {
   Copy,
   CheckCircle,
   Pencil,
-  MessageSquare,
-  Send,
   Clock,
   Layers,
   Users,
@@ -54,7 +52,14 @@ import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { useGlobalToast } from '@/components/ui/global-toast';
 import { logClientError } from '@/lib/error-logger';
-import type { Asset, Slug, Initiative, SavedSearch, AssetComment } from '@/lib/types';
+import type { Asset, Slug, Initiative, SavedSearch } from '@/lib/types';
+import { VersionChain } from '@/components/assets/version-chain';
+import { PlatformSuggestion } from '@/components/assets/platform-suggestion';
+import { SimilarAssets } from '@/components/assets/similar-assets';
+import { TreeView } from '@/components/assets/tree-view';
+import { CommentThread } from '@/components/assets/comment-thread';
+import { useComments } from '@/lib/hooks/use-comments';
+import { FolderTree } from 'lucide-react';
 
 function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' | 'lg' }) {
   const cls = size === 'lg' ? 'w-16 h-16' : size === 'md' ? 'w-8 h-8' : 'w-5 h-5';
@@ -120,6 +125,20 @@ function MultiCheckboxFilter({
 
 // Toast is now provided globally via ToastProvider in app-layout
 
+// Comment thread wrapper that uses the useComments hook
+function CommentThreadSection({ assetId, userId }: { assetId: string; userId: string | null }) {
+  const { comments, addComment, deleteComment, isLoading } = useComments(assetId);
+  if (isLoading) return <p className="text-xs text-ono-gray">טוען הערות...</p>;
+  return (
+    <CommentThread
+      comments={comments}
+      currentUserId={userId}
+      onAddComment={addComment}
+      onDeleteComment={deleteComment}
+    />
+  );
+}
+
 export default function AssetLibraryPage() {
   const searchParams = useSearchParams();
 
@@ -129,7 +148,7 @@ export default function AssetLibraryPage() {
   const [slugs, setSlugs] = useState<Slug[]>([]);
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'tree'>('grid');
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
 
@@ -161,6 +180,12 @@ export default function AssetLibraryPage() {
   const [newSearchName, setNewSearchName] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Favorites
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(searchParams.get('favorites') === 'true');
+  // "My assets" mode
+  const showMyAssets = searchParams.get('my') === 'true';
+
   // Share dialog
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareDays, setShareDays] = useState('7');
@@ -191,10 +216,7 @@ export default function AssetLibraryPage() {
   }>({});
   const [bulkSaving, setBulkSaving] = useState(false);
 
-  // Comments
-  const [comments, setComments] = useState<AssetComment[]>([]);
-  const [newComment, setNewComment] = useState('');
-  const [commentsLoading, setCommentsLoading] = useState(false);
+  // Comments — now handled by CommentThread component via useComments hook
 
   const { showError: _showError, showSuccess: _showSuccess, showInfo: _showInfo } = useGlobalToast();
 
@@ -240,6 +262,8 @@ export default function AssetLibraryPage() {
     if (filterExpiry) params.set('expiry', filterExpiry);
     if (filterUploadedBy) params.set('uploaded_by', filterUploadedBy);
     if (searchParams.get('unclassified')) params.set('unclassified', 'true');
+    if (showFavoritesOnly) params.set('favorites_only', 'true');
+    if (showMyAssets && userId) params.set('uploaded_by', userId);
     params.set('page', page.toString());
     params.set('sort_by', sortBy);
     params.set('sort_dir', sortDir);
@@ -257,7 +281,7 @@ export default function AssetLibraryPage() {
     setLoading(false);
   }, [searchQuery, filterSlugs, filterInitiatives, filterFileTypes, filterPlatforms,
       filterAspectRatios, filterDomainContexts, filterAssetTypes, filterDimensions,
-      filterDateFrom, filterDateTo, filterTag, filterExpiry, filterUploadedBy, page, sortBy, sortDir, searchParams, _showError]);
+      filterDateFrom, filterDateTo, filterTag, filterExpiry, filterUploadedBy, page, sortBy, sortDir, searchParams, _showError, showFavoritesOnly, showMyAssets, userId]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -282,14 +306,11 @@ export default function AssetLibraryPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, filterTag]);
 
-  // Load comments when detail modal opens
+  // Reset edit mode when detail modal opens
   useEffect(() => {
     if (detailAsset) {
-      loadComments(detailAsset.id);
       setEditMode(false);
-      setNewComment('');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailAsset]);
 
   // Handle direct asset link (?id=ASSET_ID) — open detail modal
@@ -311,10 +332,6 @@ export default function AssetLibraryPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, assets, loading]);
-
-  // Favorites
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(searchParams.get('favorites') === 'true');
 
   useEffect(() => {
     fetch('/api/favorites').then(r => r.ok ? r.json() : []).then(ids => {
@@ -595,8 +612,6 @@ export default function AssetLibraryPage() {
       expires_at: asset.expires_at || undefined,
       license_notes: asset.license_notes || '',
     });
-    // Load comments
-    loadComments(asset.id);
   };
 
   const saveEdit = async () => {
@@ -662,33 +677,6 @@ export default function AssetLibraryPage() {
     setSelectedAssets(new Set());
     fetchAssets();
     showToast(`${successCount} חומרים עודכנו בהצלחה`, 'success');
-  };
-
-  // ===== Comments =====
-  const loadComments = async (assetId: string) => {
-    setCommentsLoading(true);
-    try {
-      const res = await fetch(`/api/comments?asset_id=${assetId}`);
-      const data = await res.json();
-      setComments(Array.isArray(data) ? data : []);
-    } catch { setComments([]); }
-    setCommentsLoading(false);
-  };
-
-  const addComment = async () => {
-    if (!detailAsset || !newComment.trim()) return;
-    try {
-      const res = await fetch('/api/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset_id: detailAsset.id, content: newComment.trim() }),
-      });
-      if (res.ok) {
-        const comment = await res.json();
-        setComments(prev => [...prev, comment]);
-        setNewComment('');
-      }
-    } catch { showToast('שגיאה בהוספת הערה', 'error'); }
   };
 
   // ===== Version Upload =====
@@ -794,7 +782,9 @@ export default function AssetLibraryPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <FolderOpen className="w-6 h-6 text-ono-green" />
-            <h1 className="text-2xl font-bold text-ono-gray-dark">ספריית חומרים</h1>
+            <h1 className="text-2xl font-bold text-ono-gray-dark">
+              {showMyAssets ? 'הנכסים שלי' : showFavoritesOnly ? 'מועדפים' : 'ספריית חומרים'}
+            </h1>
             <Badge variant="outline" className="text-xs">{total} חומרים</Badge>
             <InfoTooltip text="כאן מוצגים כל החומרים השיווקיים. ניתן לסנן, לחפש, להוריד ולשתף. לחצו על חומר לפרטים מלאים." size="md" />
           </div>
@@ -824,15 +814,16 @@ export default function AssetLibraryPage() {
             <Button
               variant={showFavoritesOnly ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setShowFavoritesOnly(prev => !prev)}
+              onClick={() => { setShowFavoritesOnly(prev => !prev); setPage(1); }}
               className={showFavoritesOnly ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}
               title="הצג מועדפים בלבד"
             >
               <Star className={`w-4 h-4 ${showFavoritesOnly ? 'fill-current' : ''}`} />
               {favorites.size > 0 && <span className="mr-1 text-xs">{favorites.size}</span>}
             </Button>
-            <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''}><Grid3X3 className="w-4 h-4" /></Button>
-            <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''}><List className="w-4 h-4" /></Button>
+            <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''} title="תצוגת רשת"><Grid3X3 className="w-4 h-4" /></Button>
+            <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''} title="תצוגת רשימה"><List className="w-4 h-4" /></Button>
+            <Button variant={viewMode === 'tree' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('tree')} className={viewMode === 'tree' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''} title="תצוגת עץ"><FolderTree className="w-4 h-4" /></Button>
           </div>
         </div>
 
@@ -904,6 +895,19 @@ export default function AssetLibraryPage() {
                 <Share2 className="w-4 h-4 ml-1" />
                 שתף
               </Button>
+              <Button size="sm" variant="outline" onClick={async () => {
+                const ids = Array.from(selectedAssets);
+                for (const id of ids) {
+                  if (!favorites.has(id)) {
+                    await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ asset_id: id }) });
+                  }
+                }
+                setFavorites(prev => { const next = new Set(prev); ids.forEach(id => next.add(id)); return next; });
+                showToast(`${ids.length} חומרים נוספו למועדפים`, 'success');
+              }}>
+                <Star className="w-4 h-4 ml-1" />
+                הוסף למועדפים
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setShowBulkEdit(true)}>
                 <Pencil className="w-4 h-4 ml-1" />
                 ערוך נבחרים
@@ -917,7 +921,7 @@ export default function AssetLibraryPage() {
           </div>
         )}
 
-        {/* Assets grid/list */}
+        {/* Assets grid/list/tree */}
         {loading ? (
           <div className="text-center py-12 text-ono-gray">
             <div className="w-8 h-8 border-2 border-ono-green border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -928,9 +932,18 @@ export default function AssetLibraryPage() {
             <FolderOpen className="w-12 h-12 mx-auto mb-3 text-ono-gray/50" />
             <p>לא נמצאו חומרים התואמים את החיפוש</p>
           </div>
+        ) : viewMode === 'tree' ? (
+          <TreeView
+            slugs={slugs}
+            initiatives={initiatives}
+            assets={assets}
+            onFilterBySlug={(id) => { setFilterSlugs([id]); setPage(1); }}
+            onFilterByInitiative={(id) => { setFilterInitiatives([id]); setPage(1); }}
+            onSelectAsset={(asset) => setDetailAsset(asset)}
+          />
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {(showFavoritesOnly ? assets.filter(a => favorites.has(a.id)) : assets).map(asset => (
+            {assets.map(asset => (
               <div key={asset.id} className={`group bg-white border rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden cursor-pointer transition-all hover:border-ono-green ${selectedAssets.has(asset.id) ? 'border-ono-green ring-2 ring-ono-green/20' : 'border-[#E8E8E8]'}`}>
                 <div className="relative">
                   <div className="absolute top-2 right-2 z-10" onClick={(e) => { e.stopPropagation(); toggleAssetSelection(asset.id); }}>
@@ -1021,7 +1034,7 @@ export default function AssetLibraryPage() {
                 </tr>
               </thead>
               <tbody>
-                {(showFavoritesOnly ? assets.filter(a => favorites.has(a.id)) : assets).map((asset, i) => (
+                {assets.map((asset, i) => (
                   <tr key={asset.id} className={`border-b border-[#E8E8E8] hover:bg-ono-gray-light/50 cursor-pointer ${i % 2 === 1 ? 'bg-ono-gray-light/30' : ''}`} onClick={() => setDetailAsset(asset)}>
                     <td className="p-3" onClick={e => e.stopPropagation()}><Checkbox checked={selectedAssets.has(asset.id)} onCheckedChange={() => toggleAssetSelection(asset.id)} /></td>
                     <td className="p-3"><div className="flex items-center gap-2"><FileTypeIcon type={asset.file_type} size="sm" /><span className="text-ono-gray-dark truncate max-w-[200px]">{asset.stored_filename || asset.original_filename}</span></div></td>
@@ -1046,8 +1059,8 @@ export default function AssetLibraryPage() {
           </div>
         )}
 
-        {/* Pagination — hidden when favorites filter active (client-side filtering) */}
-        {total > 48 && !showFavoritesOnly && (
+        {/* Pagination */}
+        {total > 48 && (
           <div className="flex items-center justify-center gap-2 py-4">
             <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>הקודם</Button>
             <span className="text-sm text-ono-gray">עמוד {page} מתוך {Math.ceil(total / 48)}</span>
@@ -1140,7 +1153,7 @@ export default function AssetLibraryPage() {
       </aside>
 
       {/* Detail Modal */}
-      <Dialog open={!!detailAsset} onOpenChange={() => { setDetailAsset(null); setEditMode(false); setComments([]); setNewComment(''); }}>
+      <Dialog open={!!detailAsset} onOpenChange={() => { setDetailAsset(null); setEditMode(false); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto" dir="rtl">
           {detailAsset && (
             <>
@@ -1268,35 +1281,19 @@ export default function AssetLibraryPage() {
                   </>
                 )}
 
-                {/* Comments section */}
+                {/* Version chain */}
+                <VersionChain asset={detailAsset} onSelectVersion={(v) => setDetailAsset(v)} />
+
+                {/* Platform suggestion */}
+                <PlatformSuggestion asset={detailAsset} onDismiss={() => {}} />
+
+                {/* Comments section — threaded */}
                 <div className="border-t border-[#E8E8E8] pt-4">
-                  <h4 className="text-sm font-bold text-ono-gray-dark mb-3 flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4" />
-                    הערות ({comments.length})
-                  </h4>
-                  {commentsLoading ? (
-                    <p className="text-xs text-ono-gray">טוען הערות...</p>
-                  ) : (
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto mb-3">
-                      {comments.length === 0 && <p className="text-xs text-ono-gray">אין הערות עדיין</p>}
-                      {comments.map(c => (
-                        <div key={c.id} className="bg-ono-gray-light rounded-lg p-2.5 text-sm">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-ono-gray-dark text-xs">{c.user_name || 'משתמש'}</span>
-                            <span className="text-[10px] text-ono-gray">{new Date(c.created_at).toLocaleDateString('he-IL')} {new Date(c.created_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                          <p className="text-ono-gray-dark">{c.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <Input className="flex-1 text-sm" placeholder="הוסף הערה..." value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(); } }} />
-                    <Button size="sm" className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={addComment} disabled={!newComment.trim()}>
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <CommentThreadSection assetId={detailAsset.id} userId={userId} />
                 </div>
+
+                {/* Similar assets */}
+                <SimilarAssets assetId={detailAsset.id} onSelect={(a) => setDetailAsset(a)} />
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2 border-t border-[#E8E8E8]">

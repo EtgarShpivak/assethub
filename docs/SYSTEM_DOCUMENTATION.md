@@ -1,11 +1,35 @@
 # AssetHub - System Documentation / תיעוד מערכת
 
-> **Version / גרסה: 6.3.0**
+> **Version / גרסה: 7.0.0**
 > **Last Updated / עדכון אחרון: 2026-03-06**
 
 ---
 
 ## Changelog / יומן שינויים
+
+### v7.0.0 (2026-03-06)
+- **Added / נוסף:** i18n — Hebrew + English toggle (HE/EN) in top nav / מתג שפה עברית/אנגלית בסרגל העליון
+- **Added / נוסף:** Global search (Ctrl+K / Cmd+K) — search assets, slugs, initiatives / חיפוש גלובלי בכל המערכת
+- **Added / נוסף:** Server-side favorites filtering with pagination / סינון מועדפים בצד השרת עם עימוד
+- **Added / נוסף:** Bulk add to favorites — select multiple assets and favorite all / הוספת מועדפים מרובים בלחיצה
+- **Added / נוסף:** Auto-favorite on upload — checkbox option / הוספה אוטומטית למועדפים בעת העלאה
+- **Added / נוסף:** Version chain timeline — view and download previous versions / ציר זמן גרסאות עם צפייה והורדה
+- **Added / נוסף:** Tree/folder view — hierarchical view of slugs and campaigns / תצוגת עץ היררכית
+- **Added / נוסף:** "My Assets" view — filter to own uploads / "הנכסים שלי" — סינון לפי מעלה
+- **Added / נוסף:** Comment threads with replies / הערות בשרשור עם תגובות
+- **Added / נוסף:** Similar assets suggestions — metadata-based matching / חומרים דומים על בסיס מטא-דאטה
+- **Added / נוסף:** Platform suggestion — match dimensions to PLATFORM_SPECS / המלצת פלטפורמה
+- **Added / נוסף:** Monthly usage reports with charts / דוחות שימוש חודשיים עם גרפים
+- **Added / נוסף:** Activity heatmap — 7×24 day×hour grid / מפת חום פעילות
+- **Added / נוסף:** Audit trail CSV export with date range / ייצוא CSV של יומן ביקורת
+- **Added / נוסף:** Filter counts API — show counts per filter dimension / ספירת תוצאות לכל מסנן
+- **Added / נוסף:** SWR caching layer for comments / שכבת מטמון SWR להערות
+- **Added / נוסף:** PDF full-text search via text_content column / חיפוש טקסט מלא ב-PDF
+- **Added / נוסף:** Reports page (admin) with monthly charts, heatmap, export / דף דוחות למנהלים
+- **Improved / שופר:** Comment system now supports threaded replies / מערכת הערות תומכת בשרשורים
+- **Improved / שופר:** Favorites now filter server-side for correct pagination / מועדפים מסוננים בשרת
+- **Fixed / תוקן:** Version viewing now allows clicking to switch and download / צפייה בגרסה ישנה עם הורדה
+- **DB Migration:** `supabase/migrations/20260306_v7.sql` — parent_comment_id, text_content, activity indexes
 
 ### v6.3.0 (2026-03-06)
 - **Added / נוסף:** Favorites system - star assets for quick access / מועדפים - סמנו חומרים בכוכב לגישה מהירה
@@ -44,6 +68,11 @@
 15. [Comments / הערות](#comments)
 16. [Expiry & Licensing / תפוגה ורישיונות](#expiry)
 17. [File Naming / שמות קבצים](#file-naming)
+18. [Global Search / חיפוש גלובלי](#global-search)
+19. [i18n / דו-לשוניות](#i18n)
+20. [Reports / דוחות](#reports)
+21. [Tree View / תצוגת עץ](#tree-view)
+22. [Similar Assets / חומרים דומים](#similar-assets)
 
 ---
 
@@ -594,6 +623,69 @@ The system automatically generates meaningful, unique filenames for every upload
 
 ---
 
+<a id="global-search"></a>
+## 18. Global Search / חיפוש גלובלי
+
+### EN
+Press Ctrl+K (or Cmd+K on Mac) to open the global search. Search assets, slugs, and initiatives from anywhere. Recent searches are saved locally. Quick page navigation available when no query is entered.
+
+### HE
+לחצו Ctrl+K (או Cmd+K ב-Mac) לפתיחת חיפוש גלובלי. מחפש חומרים, סלאגים וקמפיינים ממקום אחד. חיפושים אחרונים נשמרים. ניווט מהיר לדפים כשאין שאילתה.
+
+---
+
+<a id="i18n"></a>
+## 19. i18n / דו-לשוניות
+
+### EN
+Toggle between Hebrew and English using the HE/EN button in the top navigation bar. Language preference is saved in the browser and persists across sessions. The interface direction (RTL/LTR) updates automatically.
+
+### HE
+עברו בין עברית לאנגלית באמצעות כפתור HE/EN בסרגל העליון. העדפת השפה נשמרת בדפדפן ונשמרת בין כניסות. כיוון הממשק (ימין-לשמאל / שמאל-לימין) מתעדכן אוטומטית.
+
+---
+
+<a id="reports"></a>
+## 20. Reports / דוחות
+
+### EN
+Monthly usage reports for administrators. Includes upload/download/view counts per month, bar charts, activity heatmap (7×24 day-of-week × hour grid), top users, top downloaded assets, and audit trail CSV export with date range filtering.
+
+**Features:**
+- Monthly summary cards: total uploads, downloads, active users
+- Bar charts showing activity trends by month
+- Activity heatmap: color-coded grid showing peak usage times
+- Top 10 most active users
+- Top 10 most downloaded assets
+- CSV export of full audit trail with date range
+
+### HE
+דוחות שימוש חודשיים למנהלים. כולל ספירת העלאות/הורדות/צפיות לפי חודש, גרפים, מפת חום פעילות (7×24), משתמשים מובילים, חומרים מורדים ביותר, וייצוא CSV של יומן ביקורת עם סינון תאריכים.
+
+---
+
+<a id="tree-view"></a>
+## 21. Tree View / תצוגת עץ
+
+### EN
+Hierarchical folder-like view of slugs and campaigns. Click tree nodes to filter the asset grid by slug or campaign. Asset counts shown next to each node.
+
+### HE
+תצוגה היררכית של סלאגים וקמפיינים בסגנון תיקיות. לחצו על צומת בעץ לסינון הגריד לפי סלאג או קמפיין. ספירת חומרים מוצגת ליד כל צומת.
+
+---
+
+<a id="similar-assets"></a>
+## 22. Similar Assets / חומרים דומים
+
+### EN
+When viewing an asset's detail, a "Similar Assets" section appears below showing assets with matching metadata: same slug, campaign, file type, aspect ratio, domain context, overlapping tags and platforms. Click to switch view to that asset.
+
+### HE
+בעת צפייה בפרטי חומר, מופיעה שורת "חומרים דומים" עם חומרים בעלי מאפיינים דומים: אותו סלאג, קמפיין, סוג קובץ, יחס מידות, סוג תוכן, תגיות ופלטפורמות חופפות. לחצו למעבר לחומר.
+
+---
+
 ## Technical Information / מידע טכני
 
 - **Framework:** Next.js 14 (App Router) + TypeScript
@@ -602,3 +694,6 @@ The system automatically generates meaningful, unique filenames for every upload
 - **Authentication:** Supabase Auth (email/magic link)
 - **Hosting:** Vercel (Hobby plan)
 - **UI:** Tailwind CSS + custom Ono brand theme (RTL Hebrew)
+- **Caching:** SWR for client-side data fetching (comments, favorites)
+- **i18n:** Custom React context with HE/EN translations
+- **Search:** cmdk (Command Menu) for global Ctrl+K search

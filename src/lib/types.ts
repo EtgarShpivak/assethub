@@ -187,6 +187,7 @@ export interface AssetComment {
   user_id: string | null;
   user_name: string | null;
   content: string;
+  parent_comment_id: string | null;
   created_at: string;
 }
 
