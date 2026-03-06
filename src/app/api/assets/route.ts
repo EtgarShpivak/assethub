@@ -233,6 +233,12 @@ export async function GET(request: NextRequest) {
     query = query.or('platforms.is.null,platforms.eq.{}');
   }
 
+  // Parent asset filter — for version chain queries
+  const parentAssetId = searchParams.get('parent_asset_id');
+  if (parentAssetId) {
+    query = query.or(`id.eq.${parentAssetId},parent_asset_id.eq.${parentAssetId}`);
+  }
+
   // Uploaded-by filter — supports single user ID
   const uploadedBy = searchParams.get('uploaded_by');
   if (uploadedBy) {

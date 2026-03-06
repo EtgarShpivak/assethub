@@ -187,6 +187,13 @@ export const translations: Record<Locale, Record<string, string>> = {
     'reports.thursday': 'חמישי',
     'reports.friday': 'שישי',
     'reports.saturday': 'שבת',
+    'reports.less': 'פחות',
+    'reports.more': 'יותר',
+    'reports.actions': 'פעולות',
+
+    // Sidebar
+    'sidebar.mediaManagement': 'ניהול מדיה',
+    'sidebar.onoAcademic': 'הקריה האקדמית אונו',
 
     // Statuses
     'status.active': 'פעיל',
@@ -396,6 +403,13 @@ export const translations: Record<Locale, Record<string, string>> = {
     'reports.thursday': 'Thursday',
     'reports.friday': 'Friday',
     'reports.saturday': 'Saturday',
+    'reports.less': 'Less',
+    'reports.more': 'More',
+    'reports.actions': 'actions',
+
+    // Sidebar
+    'sidebar.mediaManagement': 'Media Management',
+    'sidebar.onoAcademic': 'Ono Academic College',
 
     // Statuses
     'status.active': 'Active',

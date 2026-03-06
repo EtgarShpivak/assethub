@@ -18,17 +18,14 @@ export function VersionChain({ asset, onSelectVersion }: VersionChainProps) {
   useEffect(() => {
     const parentId = asset.parent_asset_id || asset.id;
     setLoading(true);
-    fetch(`/api/assets?search=&limit=50&sort_by=upload_date&sort_dir=asc`)
+    fetch(`/api/assets?parent_asset_id=${parentId}&limit=50&sort_by=upload_date&sort_dir=asc`)
       .then(r => r.json())
       .then(data => {
         const allAssets: Asset[] = data.assets || [];
-        // Find all versions: same parent_asset_id or the parent itself
-        const chain = allAssets.filter(a =>
-          a.id === parentId || a.parent_asset_id === parentId
-        ).sort((a, b) => (a.version || 1) - (b.version || 1));
+        const chain = allAssets.sort((a, b) => (a.version || 1) - (b.version || 1));
         setVersions(chain.length > 1 ? chain : []);
       })
-      .catch(() => {})
+      .catch((err) => console.warn('VersionChain fetch error:', err))
       .finally(() => setLoading(false));
   }, [asset.id, asset.parent_asset_id]);
 

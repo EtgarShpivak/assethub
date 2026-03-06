@@ -66,7 +66,7 @@ export function ActivityHeatmap({ data }: ActivityHeatmapProps) {
                   <div
                     key={h}
                     className={`flex-1 h-5 rounded-sm ${getColor(val)} transition-colors`}
-                    title={`${dayName} ${h}:00 — ${val} פעולות`}
+                    title={`${dayName} ${h}:00 — ${val} ${t('reports.actions')}`}
                   />
                 );
               })}
@@ -75,13 +75,13 @@ export function ActivityHeatmap({ data }: ActivityHeatmapProps) {
 
           {/* Legend */}
           <div className="flex items-center gap-2 mt-3 justify-center">
-            <span className="text-[10px] text-ono-gray">פחות</span>
+            <span className="text-[10px] text-ono-gray">{t('reports.less')}</span>
             <div className="w-4 h-3 rounded-sm bg-ono-gray-light" />
             <div className="w-4 h-3 rounded-sm bg-green-100" />
             <div className="w-4 h-3 rounded-sm bg-green-200" />
             <div className="w-4 h-3 rounded-sm bg-green-400" />
             <div className="w-4 h-3 rounded-sm bg-ono-green" />
-            <span className="text-[10px] text-ono-gray">יותר</span>
+            <span className="text-[10px] text-ono-gray">{t('reports.more')}</span>
           </div>
         </div>
       </div>

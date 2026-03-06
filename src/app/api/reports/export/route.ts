@@ -57,13 +57,14 @@ export async function GET(request: NextRequest) {
 }
 
 function sanitizeCsvField(value: string): string {
-  // Prevent CSV formula injection
-  const sanitized = value.replace(/"/g, '""');
-  if (/^[=+\-@\t\r]/.test(sanitized)) {
-    return `"'${sanitized}"`;
+  // Trim first, then prevent CSV formula injection
+  const trimmed = value.trim();
+  const escaped = trimmed.replace(/"/g, '""');
+  if (/^[=+\-@\t\r]/.test(escaped)) {
+    return `"'${escaped}"`;
   }
-  if (sanitized.includes(',') || sanitized.includes('"') || sanitized.includes('\n')) {
-    return `"${sanitized}"`;
+  if (escaped.includes(',') || escaped.includes('"') || escaped.includes('\n')) {
+    return `"${escaped}"`;
   }
-  return sanitized;
+  return escaped;
 }

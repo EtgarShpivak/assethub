@@ -20,7 +20,6 @@ import {
   CommandDialog,
   CommandInput,
   CommandList,
-  CommandEmpty,
   CommandGroup,
   CommandItem,
   CommandSeparator,
@@ -183,23 +182,25 @@ export function GlobalSearch() {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
       <CommandInput
         placeholder={t('search.placeholder')}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
-        <CommandEmpty>
-          {loading ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-4 h-4 border-2 border-ono-green border-t-transparent rounded-full animate-spin" />
-              <span>{t('common.loading')}</span>
-            </div>
-          ) : (
-            t('search.noResults')
-          )}
-        </CommandEmpty>
+        {/* Manual empty state — more reliable than CommandEmpty with shouldFilter=false */}
+        {query && !loading && results.length === 0 && (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            {t('search.noResults')}
+          </div>
+        )}
+        {query && loading && (
+          <div className="py-6 flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-ono-green border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground">{t('common.loading')}</span>
+          </div>
+        )}
 
         {/* Recent searches */}
         {!query && recentSearches.length > 0 && (

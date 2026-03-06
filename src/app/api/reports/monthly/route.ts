@@ -10,9 +10,12 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const { searchParams } = new URL(request.url);
 
-  // Default to last 6 months
-  const monthsBack = parseInt(searchParams.get('months') || '6');
+  // Default to last 6 months, clamped 1-24
+  const rawMonths = parseInt(searchParams.get('months') || '6');
+  const monthsBack = Math.min(Math.max(isNaN(rawMonths) ? 6 : rawMonths, 1), 24);
+  // Use 1st of month to avoid edge cases (e.g., March 31 - 1 month ≠ Feb 28)
   const fromDate = new Date();
+  fromDate.setDate(1);
   fromDate.setMonth(fromDate.getMonth() - monthsBack);
 
   // Get activity data grouped by month and action

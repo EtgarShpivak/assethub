@@ -20,26 +20,32 @@ const I18nContext = createContext<I18nContextType>({
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('he');
 
-  // Load persisted locale
+  // Load persisted locale (guarded for restricted localStorage contexts)
   useEffect(() => {
-    const saved = localStorage.getItem('assethub-locale') as Locale | null;
-    if (saved && (saved === 'he' || saved === 'en')) {
-      setLocaleState(saved);
-    }
+    try {
+      const saved = localStorage.getItem('assethub-locale') as Locale | null;
+      if (saved && (saved === 'he' || saved === 'en')) {
+        setLocaleState(saved);
+      }
+    } catch { /* localStorage unavailable */ }
   }, []);
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
-    localStorage.setItem('assethub-locale', newLocale);
+    try { localStorage.setItem('assethub-locale', newLocale); } catch { /* ignore */ }
     // Update document direction
-    document.documentElement.dir = newLocale === 'he' ? 'rtl' : 'ltr';
-    document.documentElement.lang = newLocale;
+    if (typeof document !== 'undefined') {
+      document.documentElement.dir = newLocale === 'he' ? 'rtl' : 'ltr';
+      document.documentElement.lang = newLocale;
+    }
   }, []);
 
   // Set initial direction
   useEffect(() => {
-    document.documentElement.dir = locale === 'he' ? 'rtl' : 'ltr';
-    document.documentElement.lang = locale;
+    if (typeof document !== 'undefined') {
+      document.documentElement.dir = locale === 'he' ? 'rtl' : 'ltr';
+      document.documentElement.lang = locale;
+    }
   }, [locale]);
 
   const t = useCallback((key: string): string => {

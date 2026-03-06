@@ -18,12 +18,14 @@ function SingleComment({
   onReply,
   onDelete,
   isReply = false,
+  t,
 }: {
   comment: CommentWithReplies;
   currentUserId: string | null;
   onReply: (id: string) => void;
   onDelete: (id: string) => void;
   isReply?: boolean;
+  t: (key: string) => string;
 }) {
   return (
     <div className={`${isReply ? 'mr-6 border-r-2 border-ono-green-light pr-3' : ''}`}>
@@ -36,7 +38,7 @@ function SingleComment({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-ono-gray-dark">
-              {comment.user_name || 'משתמש'}
+              {comment.user_name || t('topnav.user')}
             </span>
             <span className="text-[10px] text-ono-gray">
               {new Date(comment.created_at).toLocaleDateString('he-IL')}{' '}
@@ -51,7 +53,7 @@ function SingleComment({
                 className="text-[10px] text-ono-gray hover:text-ono-green flex items-center gap-0.5"
               >
                 <Reply className="w-3 h-3" />
-                הגב
+                {t('assets.reply')}
               </button>
             )}
             {comment.user_id === currentUserId && (
@@ -60,7 +62,7 @@ function SingleComment({
                 className="text-[10px] text-ono-gray hover:text-red-500 flex items-center gap-0.5"
               >
                 <Trash2 className="w-3 h-3" />
-                מחק
+                {t('assets.delete')}
               </button>
             )}
           </div>
@@ -114,6 +116,7 @@ export function CommentThread({ comments, currentUserId, onAddComment, onDeleteC
             currentUserId={currentUserId}
             onReply={setReplyingTo}
             onDelete={onDeleteComment}
+            t={t}
           />
 
           {/* Replies */}
@@ -127,6 +130,7 @@ export function CommentThread({ comments, currentUserId, onAddComment, onDeleteC
                   onReply={() => setReplyingTo(comment.id)}
                   onDelete={onDeleteComment}
                   isReply
+                  t={t}
                 />
               ))}
             </div>

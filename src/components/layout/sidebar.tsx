@@ -22,16 +22,17 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n/provider';
 
 interface NavLink {
   href: string;
-  label: string;
+  labelKey: string;
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
 }
 
 interface NavGroup {
-  label: string;
+  labelKey: string;
   icon: typeof LayoutDashboard;
   children: NavLink[];
   adminOnly?: boolean;
@@ -44,37 +45,38 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 }
 
 const navEntries: NavEntry[] = [
-  { href: '/', label: 'דשבורד', icon: LayoutDashboard },
-  { href: '/assets', label: 'ספריית חומרים', icon: FolderOpen },
-  { href: '/assets?favorites=true', label: 'מועדפים', icon: Star },
-  { href: '/assets?my=true', label: 'הנכסים שלי', icon: UserCircle },
-  { href: '/upload', label: 'העלאת חומרים', icon: Upload },
+  { href: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { href: '/assets', labelKey: 'nav.assets', icon: FolderOpen },
+  { href: '/assets?favorites=true', labelKey: 'nav.favorites', icon: Star },
+  { href: '/assets?my=true', labelKey: 'nav.myAssets', icon: UserCircle },
+  { href: '/upload', labelKey: 'nav.upload', icon: Upload },
   {
-    label: 'ניהול מערכת',
+    labelKey: 'nav.systemManagement',
     icon: Wrench,
     children: [
-      { href: '/initiatives', label: 'קמפיינים', icon: Megaphone },
-      { href: '/archive', label: 'ארכיון', icon: Archive },
-      { href: '/settings/tags', label: 'ניהול תגיות', icon: Tag },
-      { href: '/settings/slugs', label: 'ניהול סלאגים', icon: Tag },
-      { href: '/collections', label: 'אוספים', icon: Bookmark },
+      { href: '/initiatives', labelKey: 'nav.campaigns', icon: Megaphone },
+      { href: '/archive', labelKey: 'nav.archive', icon: Archive },
+      { href: '/settings/tags', labelKey: 'nav.tagManagement', icon: Tag },
+      { href: '/settings/slugs', labelKey: 'nav.slugManagement', icon: Tag },
+      { href: '/collections', labelKey: 'nav.collections', icon: Bookmark },
     ],
   },
   {
-    label: 'הגדרות',
+    labelKey: 'nav.settings',
     icon: Settings,
     children: [
-      { href: '/settings', label: 'משתמשים והרשאות', icon: Settings },
-      { href: '/activity', label: 'יומן פעילות', icon: ScrollText },
-      { href: '/reports', label: 'דוחות', icon: BarChart3 },
+      { href: '/settings', labelKey: 'nav.usersPermissions', icon: Settings },
+      { href: '/activity', labelKey: 'nav.activityLog', icon: ScrollText },
+      { href: '/reports', labelKey: 'nav.reports', icon: BarChart3 },
     ],
   },
-  { href: '/help', label: 'עזרה ותמיכה', icon: HelpCircle },
+  { href: '/help', labelKey: 'nav.help', icon: HelpCircle },
 ];
 
 export function Sidebar({ userRole }: { userRole?: string }) {
   const pathname = usePathname();
   const isAdmin = userRole === 'admin';
+  const { t } = useTranslation();
 
   // Determine which groups should be open by default (based on current path)
   const getInitialOpen = () => {
@@ -84,7 +86,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
         const childActive = entry.children.some(child =>
           child.href === '/' ? pathname === '/' : pathname.startsWith(child.href)
         );
-        open[entry.label] = childActive;
+        open[entry.labelKey] = childActive;
       }
     });
     return open;
@@ -92,8 +94,8 @@ export function Sidebar({ userRole }: { userRole?: string }) {
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(getInitialOpen);
 
-  const toggleGroup = (label: string) => {
-    setOpenGroups(prev => ({ ...prev, [label]: !prev[label] }));
+  const toggleGroup = (key: string) => {
+    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const renderLink = (item: NavLink, isChild = false) => {
@@ -119,9 +121,9 @@ export function Sidebar({ userRole }: { userRole?: string }) {
           )}
         >
           <Icon className={cn('w-4 h-4 shrink-0', item.adminOnly && !isActive ? 'text-red-400' : '', isChild ? 'w-4 h-4' : 'w-5 h-5')} />
-          <span>{item.label}</span>
+          <span>{t(item.labelKey)}</span>
           {item.adminOnly && (
-            <span className="text-[9px] bg-red-100 text-red-600 px-1 py-0.5 rounded mr-auto">אדמין</span>
+            <span className="text-[9px] bg-red-100 text-red-600 px-1 py-0.5 rounded mr-auto">{t('common.admin')}</span>
           )}
         </Link>
       </li>
@@ -133,16 +135,16 @@ export function Sidebar({ userRole }: { userRole?: string }) {
     const visibleChildren = group.children.filter(c => !c.adminOnly || isAdmin);
     if (visibleChildren.length === 0) return null;
 
-    const isOpen = openGroups[group.label] ?? false;
+    const isOpen = openGroups[group.labelKey] ?? false;
     const hasActiveChild = visibleChildren.some(child =>
       child.href === '/' ? pathname === '/' : pathname.startsWith(child.href)
     );
     const Icon = group.icon;
 
     return (
-      <li key={group.label}>
+      <li key={group.labelKey}>
         <button
-          onClick={() => toggleGroup(group.label)}
+          onClick={() => toggleGroup(group.labelKey)}
           className={cn(
             'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors w-full text-right',
             hasActiveChild
@@ -151,7 +153,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
           )}
         >
           <Icon className="w-5 h-5 shrink-0" />
-          <span className="flex-1">{group.label}</span>
+          <span className="flex-1">{t(group.labelKey)}</span>
           <ChevronDown className={cn(
             'w-4 h-4 shrink-0 transition-transform duration-200',
             isOpen ? 'rotate-180' : ''
@@ -173,16 +175,16 @@ export function Sidebar({ userRole }: { userRole?: string }) {
         <div className="flex flex-col items-center gap-2">
           <Image
             src="/ono-logo.png"
-            alt="הקריה האקדמית אונו"
+            alt={t('sidebar.onoAcademic')}
             width={160}
             height={79}
             priority
           />
           <h2 className="text-sm font-bold text-ono-gray-dark text-center leading-tight">
-            ניהול מדיה
+            {t('sidebar.mediaManagement')}
           </h2>
           <span className="text-[10px] text-ono-gray text-center">
-            הקריה האקדמית אונו
+            {t('sidebar.onoAcademic')}
           </span>
         </div>
       </div>

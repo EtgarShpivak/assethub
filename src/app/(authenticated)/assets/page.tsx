@@ -90,11 +90,13 @@ function MultiCheckboxFilter({
   options,
   selected,
   onChange,
+  counts,
 }: {
   label: string;
   options: readonly { value: string; label: string }[];
   selected: string[];
   onChange: (values: string[]) => void;
+  counts?: Record<string, number>;
 }) {
   const toggle = (value: string) => {
     if (selected.includes(value)) {
@@ -116,6 +118,9 @@ function MultiCheckboxFilter({
               className="h-3.5 w-3.5"
             />
             <span className="text-ono-gray-dark">{opt.label}</span>
+            {counts && counts[opt.value] !== undefined && (
+              <span className="text-[10px] text-ono-gray mr-auto">({counts[opt.value]})</span>
+            )}
           </label>
         ))}
       </div>
@@ -148,6 +153,7 @@ export default function AssetLibraryPage() {
   const [slugs, setSlugs] = useState<Slug[]>([]);
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([]);
+  const [filterCounts, setFilterCounts] = useState<Record<string, Record<string, number>>>({});
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'tree'>('grid');
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
@@ -285,16 +291,28 @@ export default function AssetLibraryPage() {
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
-  // Load slugs and initiatives once
+  // Load slugs, initiatives, tags, and filter counts once
   useEffect(() => {
     Promise.all([
       fetch('/api/slugs').then(r => r.json()),
       fetch('/api/initiatives').then(r => r.json()),
       fetch('/api/tags').then(r => r.json()),
-    ]).then(([sl, ini, tags]) => {
+      fetch('/api/assets/counts').then(r => r.json()).catch(() => ({})),
+    ]).then(([sl, ini, tags, counts]) => {
       setSlugs(sl);
       setInitiatives(ini);
       setAvailableTags(tags || []);
+      if (counts && !counts.error) {
+        setFilterCounts({
+          file_types: counts.file_types || {},
+          platforms: counts.platforms || {},
+          aspect_ratios: counts.aspect_ratios || {},
+          domain_contexts: counts.domain_contexts || {},
+          asset_types: counts.asset_types || {},
+          slugs: counts.slugs || {},
+          initiatives: counts.initiatives || {},
+        });
+      }
       initialLoad.current = false;
     });
   }, []);
@@ -1115,19 +1133,19 @@ export default function AssetLibraryPage() {
             />
           </div>
 
-          <MultiCheckboxFilter label="סלאג" options={slugOptions} selected={filterSlugs} onChange={v => { setFilterSlugs(v); setPage(1); }} />
-          <MultiCheckboxFilter label="קמפיין" options={[{ value: '__no_initiative__', label: 'ללא קמפיין' }, ...initiativeOptions]} selected={filterInitiatives} onChange={v => { setFilterInitiatives(v); setPage(1); }} />
-          <MultiCheckboxFilter label="סוג קובץ" options={FILE_TYPES} selected={filterFileTypes} onChange={v => { setFilterFileTypes(v); setPage(1); }} />
-          <MultiCheckboxFilter label="סוג חומר" options={ASSET_TYPES} selected={filterAssetTypes} onChange={v => { setFilterAssetTypes(v); setPage(1); }} />
-          <MultiCheckboxFilter label="פלטפורמה" options={[...PLATFORMS, { value: 'none', label: 'ללא שיוך', color: '#888' } as { value: string; label: string; color: string }]} selected={filterPlatforms} onChange={v => { setFilterPlatforms(v); setPage(1); }} />
-          <MultiCheckboxFilter label="יחס מידות" options={[...ASPECT_RATIOS, { value: 'other', label: 'אחר' }]} selected={filterAspectRatios} onChange={v => { setFilterAspectRatios(v); setPage(1); }} />
+          <MultiCheckboxFilter label="סלאג" options={slugOptions} selected={filterSlugs} onChange={v => { setFilterSlugs(v); setPage(1); }} counts={filterCounts.slugs} />
+          <MultiCheckboxFilter label="קמפיין" options={[{ value: '__no_initiative__', label: 'ללא קמפיין' }, ...initiativeOptions]} selected={filterInitiatives} onChange={v => { setFilterInitiatives(v); setPage(1); }} counts={filterCounts.initiatives} />
+          <MultiCheckboxFilter label="סוג קובץ" options={FILE_TYPES} selected={filterFileTypes} onChange={v => { setFilterFileTypes(v); setPage(1); }} counts={filterCounts.file_types} />
+          <MultiCheckboxFilter label="סוג חומר" options={ASSET_TYPES} selected={filterAssetTypes} onChange={v => { setFilterAssetTypes(v); setPage(1); }} counts={filterCounts.asset_types} />
+          <MultiCheckboxFilter label="פלטפורמה" options={[...PLATFORMS, { value: 'none', label: 'ללא שיוך', color: '#888' } as { value: string; label: string; color: string }]} selected={filterPlatforms} onChange={v => { setFilterPlatforms(v); setPage(1); }} counts={filterCounts.platforms} />
+          <MultiCheckboxFilter label="יחס מידות" options={[...ASPECT_RATIOS, { value: 'other', label: 'אחר' }]} selected={filterAspectRatios} onChange={v => { setFilterAspectRatios(v); setPage(1); }} counts={filterCounts.aspect_ratios} />
 
           <div>
             <Label className="text-xs">מידות מדויקות</Label>
             <Input dir="ltr" className="text-left text-xs mt-1" placeholder="1080×1920" value={filterDimensions} onChange={e => { setFilterDimensions(e.target.value); setPage(1); }} />
           </div>
 
-          <MultiCheckboxFilter label="סוג תוכן" options={DOMAIN_CONTEXTS} selected={filterDomainContexts} onChange={v => { setFilterDomainContexts(v); setPage(1); }} />
+          <MultiCheckboxFilter label="סוג תוכן" options={DOMAIN_CONTEXTS} selected={filterDomainContexts} onChange={v => { setFilterDomainContexts(v); setPage(1); }} counts={filterCounts.domain_contexts} />
 
           <div>
             <Label className="text-xs mb-1.5 block">תוקף</Label>

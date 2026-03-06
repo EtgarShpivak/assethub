@@ -20,10 +20,14 @@ interface TopNavProps {
 export function TopNav({ userName, userEmail }: TopNavProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { t, locale, setLocale } = useTranslation();
+  const { t, locale, setLocale, dir } = useTranslation();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
     router.push('/login');
     router.refresh();
   };
@@ -69,7 +73,7 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
           {t('topnav.language')}
         </Button>
 
-        <DropdownMenu dir="rtl">
+        <DropdownMenu dir={dir}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 text-sm">
               <div className="w-8 h-8 bg-ono-green-light rounded-full flex items-center justify-center">
