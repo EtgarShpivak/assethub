@@ -1,11 +1,31 @@
 # AssetHub - System Documentation / תיעוד מערכת
 
-> **Version / גרסה: 7.0.0**
-> **Last Updated / עדכון אחרון: 2026-03-06**
+> **Version / גרסה: 7.0.1**
+> **Last Updated / עדכון אחרון: 2026-03-07**
 
 ---
 
 ## Changelog / יומן שינויים
+
+### v7.0.1 — QA Fixes (2026-03-07)
+
+**Bugs Fixed / באגים שתוקנו:**
+- Global search: disabled cmdk built-in filtering that blocked Hebrew slug/initiative results
+- Version chain: switched from client-side 50-asset filter to server-side parent_asset_id API filter
+- Top-nav: added logout error handling, dynamic dir for language switching
+- CSV export: trim whitespace before formula injection check
+- Monthly reports: safer date math (1st of month), input validation with clamping
+- i18n provider: added localStorage try-catch and SSR document guard
+
+**i18n Improvements / שיפורי דו-לשוניות:**
+- Sidebar: converted all 15+ hardcoded Hebrew labels to translation keys
+- Comment thread: reply/delete buttons now use i18n
+- Activity heatmap: legend labels (less/more/actions) now use i18n
+- Added 7 new translation keys (reports.less, reports.more, reports.actions, sidebar.mediaManagement, sidebar.onoAcademic)
+
+**New Features / תכונות חדשות:**
+- Filter counts (4.3): sidebar filters now show asset counts next to each option (e.g., "תמונות (245)")
+- parent_asset_id API parameter for version chain queries
 
 ### v7.0.0 (2026-03-06)
 - **Added / נוסף:** i18n — Hebrew + English toggle (HE/EN) in top nav / מתג שפה עברית/אנגלית בסרגל העליון
