@@ -33,6 +33,8 @@ import {
   Users,
   Star,
   Upload as UploadIcon,
+  ScrollText,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +70,8 @@ function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' 
     case 'video': return <Film className={`${cls} text-platform-meta`} />;
     case 'pdf': return <FileText className={`${cls} text-platform-google`} />;
     case 'newsletter': return <Newspaper className={`${cls} text-ono-orange`} />;
+    case 'brief': return <ScrollText className={`${cls} text-sky-600`} />;
+    case 'link': return <ExternalLink className={`${cls} text-purple-600`} />;
     default: return <File className={`${cls} text-ono-gray`} />;
   }
 }
@@ -982,16 +986,35 @@ export default function AssetLibraryPage() {
                   >
                     <Star className={`w-3.5 h-3.5 ${favorites.has(asset.id) ? 'fill-current' : ''}`} />
                   </button>
-                  {/* Quick download button */}
-                  <button
-                    className="absolute bottom-2 left-2 z-10 w-7 h-7 rounded-full bg-white/90 border border-[#E8E8E8] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-ono-green hover:text-white hover:border-ono-green"
-                    onClick={(e) => { e.stopPropagation(); handleDownloadSingle(asset); }}
-                    title="הורד קובץ"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
+                  {/* Quick download / open link button */}
+                  {asset.file_type === 'link' && asset.external_url ? (
+                    <button
+                      className="absolute bottom-2 left-2 z-10 w-7 h-7 rounded-full bg-white/90 border border-[#E8E8E8] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-purple-600 hover:text-white hover:border-purple-600"
+                      onClick={(e) => { e.stopPropagation(); window.open(asset.external_url!, '_blank'); }}
+                      title="פתח קישור"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      className="absolute bottom-2 left-2 z-10 w-7 h-7 rounded-full bg-white/90 border border-[#E8E8E8] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-ono-green hover:text-white hover:border-ono-green"
+                      onClick={(e) => { e.stopPropagation(); handleDownloadSingle(asset); }}
+                      title="הורד קובץ"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <div className="aspect-square bg-ono-gray-light flex items-center justify-center relative" onClick={() => setDetailAsset(asset)}>
-                    {asset.drive_view_url && asset.file_type === 'image' ? (
+                    {asset.file_type === 'link' ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <ExternalLink className="w-12 h-12 text-purple-500" />
+                        {asset.external_url && (
+                          <span className="text-[10px] text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full max-w-[90%] truncate">
+                            {(() => { try { return new URL(asset.external_url).hostname; } catch { return 'קישור'; } })()}
+                          </span>
+                        )}
+                      </div>
+                    ) : asset.drive_view_url && asset.file_type === 'image' ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={asset.drive_view_url} alt={asset.original_filename} className="w-full h-full object-cover" loading="lazy" />
                     ) : asset.drive_view_url && asset.file_type === 'video' ? (
@@ -1185,9 +1208,31 @@ export default function AssetLibraryPage() {
                 </div>
               </DialogHeader>
               <div className="space-y-4">
-                {/* Preview: Image / Video / Icon */}
+                {/* Preview: Image / Video / Link / Icon */}
                 <div className="bg-ono-gray-light rounded-lg flex items-center justify-center p-4 min-h-[200px]">
-                  {detailAsset.drive_view_url && detailAsset.file_type === 'image' ? (
+                  {detailAsset.file_type === 'link' && detailAsset.external_url ? (
+                    <div className="flex flex-col items-center gap-3 py-4">
+                      <ExternalLink className="w-16 h-16 text-purple-500" />
+                      <a
+                        href={detailAsset.external_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-purple-600 hover:text-purple-800 underline font-mono max-w-full truncate px-4"
+                        dir="ltr"
+                      >
+                        {detailAsset.external_url}
+                      </a>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-purple-300 text-purple-600 hover:bg-purple-50"
+                        onClick={() => window.open(detailAsset.external_url!, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 ml-1" />
+                        פתח קישור
+                      </Button>
+                    </div>
+                  ) : detailAsset.drive_view_url && detailAsset.file_type === 'image' ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={detailAsset.drive_view_url} alt={detailAsset.original_filename} className="max-h-[400px] rounded" />
                   ) : detailAsset.drive_view_url && detailAsset.file_type === 'video' ? (
@@ -1197,6 +1242,12 @@ export default function AssetLibraryPage() {
 
                 {/* Badges row */}
                 <div className="flex flex-wrap gap-2">
+                  {detailAsset.file_type === 'link' && detailAsset.external_url && (
+                    <Badge className="bg-purple-50 text-purple-600 border-purple-200">
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                      {(() => { try { return new URL(detailAsset.external_url).hostname; } catch { return 'קישור'; } })()}
+                    </Badge>
+                  )}
                   {detailAsset.dimensions_label && <Badge className="bg-ono-green-light text-ono-green-dark border-ono-green/30">{detailAsset.dimensions_label}</Badge>}
                   {detailAsset.aspect_ratio && <Badge className="bg-ono-green-light text-ono-green-dark border-ono-green/30">{detailAsset.aspect_ratio}</Badge>}
                   {detailAsset.file_size_label && <Badge variant="outline">{detailAsset.file_size_label}</Badge>}
@@ -1315,7 +1366,11 @@ export default function AssetLibraryPage() {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2 border-t border-[#E8E8E8]">
-                  <Button className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={() => handleDownloadSingle(detailAsset)}><Download className="w-4 h-4 ml-2" />הורד</Button>
+                  {detailAsset.file_type === 'link' && detailAsset.external_url ? (
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => window.open(detailAsset.external_url!, '_blank')}><ExternalLink className="w-4 h-4 ml-2" />פתח קישור</Button>
+                  ) : (
+                    <Button className="bg-ono-green hover:bg-ono-green-dark text-white" onClick={() => handleDownloadSingle(detailAsset)}><Download className="w-4 h-4 ml-2" />הורד</Button>
+                  )}
                   <Button
                     variant="outline"
                     className={favorites.has(detailAsset.id) ? 'bg-yellow-50 border-yellow-400 text-yellow-600' : ''}

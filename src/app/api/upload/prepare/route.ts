@@ -13,21 +13,30 @@ const ALLOWED_MIMES = new Set([
   'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo',
   'video/mpeg', 'video/3gpp', 'video/x-matroska', 'video/ogg',
   'application/pdf',
+  // Newsletter / design
   'application/x-indesign', 'application/postscript', 'application/illustrator',
   'application/vnd.ms-publisher', 'text/html',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
+  // Brief / documents
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-powerpoint', 'application/msword',
+  'application/msword',
+  'text/plain', 'application/rtf', 'text/rtf',
+  'application/vnd.oasis.opendocument.text',
 ]);
 
 const NEWSLETTER_EXTENSIONS = new Set([
-  'indd', 'ai', 'eps', 'pub', 'html', 'htm', 'pptx', 'ppt', 'docx', 'doc', 'idml',
+  'indd', 'ai', 'eps', 'pub', 'html', 'htm', 'pptx', 'ppt', 'idml',
+]);
+
+const BRIEF_EXTENSIONS = new Set([
+  'docx', 'doc', 'txt', 'rtf', 'odt', 'pages',
 ]);
 
 function isAllowedFile(name: string, type: string): boolean {
   if (ALLOWED_MIMES.has(type)) return true;
   const ext = name.split('.').pop()?.toLowerCase() || '';
-  return NEWSLETTER_EXTENSIONS.has(ext);
+  return NEWSLETTER_EXTENSIONS.has(ext) || BRIEF_EXTENSIONS.has(ext);
 }
 
 function getFileType(mime: string, filename?: string): string {
@@ -35,6 +44,12 @@ function getFileType(mime: string, filename?: string): string {
   if (mime.startsWith('video/')) return 'video';
   if (mime === 'application/pdf') return 'pdf';
   const ext = filename?.split('.').pop()?.toLowerCase() || '';
+  // Brief (documents) — check before newsletter since docx/doc moved here
+  if (BRIEF_EXTENSIONS.has(ext)) return 'brief';
+  if (mime === 'application/msword' || mime.includes('wordprocessingml')) return 'brief';
+  if (mime === 'text/plain' || mime === 'application/rtf' || mime === 'text/rtf') return 'brief';
+  if (mime.includes('opendocument.text')) return 'brief';
+  // Newsletter / design files
   if (NEWSLETTER_EXTENSIONS.has(ext)) return 'newsletter';
   if (mime === 'text/html') return 'newsletter';
   if (mime.includes('indesign') || mime.includes('publisher') || mime.includes('illustrator')) return 'newsletter';
@@ -120,7 +135,7 @@ export async function POST(request: NextRequest) {
     // Validate type
     if (!isAllowedFile(file.name, file.type)) {
       const fileExt = file.name.split('.').pop()?.toUpperCase() || '';
-      errors.push({ file: file.name, error: `סוג קובץ לא נתמך (${fileExt}). סוגים נתמכים: תמונות, סרטונים, PDF, PSD, AI.` });
+      errors.push({ file: file.name, error: `סוג קובץ לא נתמך (${fileExt}). סוגים נתמכים: תמונות, סרטונים, PDF, מסמכים, AI.` });
       continue;
     }
 

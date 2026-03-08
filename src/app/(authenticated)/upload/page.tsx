@@ -15,6 +15,9 @@ import {
   Globe,
   Newspaper,
   Star,
+  ScrollText,
+  ExternalLink,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,15 +47,20 @@ interface FileEntry {
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const NEWSLETTER_EXTS = new Set(['indd', 'ai', 'eps', 'pub', 'html', 'htm', 'pptx', 'ppt', 'docx', 'doc', 'idml']);
+const NEWSLETTER_EXTS = new Set(['indd', 'ai', 'eps', 'pub', 'html', 'htm', 'pptx', 'ppt', 'idml']);
+const BRIEF_EXTS = new Set(['docx', 'doc', 'txt', 'rtf', 'odt', 'pages']);
 
 function FileTypeIcon({ type, filename }: { type: string; filename?: string }) {
   if (type.startsWith('image/')) return <ImageIcon className="w-5 h-5 text-ono-green" />;
   if (type.startsWith('video/')) return <Film className="w-5 h-5 text-platform-meta" />;
   if (type === 'application/pdf') return <FileText className="w-5 h-5 text-platform-google" />;
   if (type.includes('zip')) return <Package className="w-5 h-5 text-ono-orange" />;
-  // Check newsletter by extension
   const ext = filename?.split('.').pop()?.toLowerCase() || '';
+  // Brief (documents)
+  if (BRIEF_EXTS.has(ext) || type === 'application/msword' || type.includes('wordprocessingml') || type === 'text/plain' || type.includes('rtf') || type.includes('opendocument.text')) {
+    return <ScrollText className="w-5 h-5 text-sky-600" />;
+  }
+  // Newsletter by extension
   if (NEWSLETTER_EXTS.has(ext) || type.includes('indesign') || type.includes('publisher') || type === 'text/html') {
     return <Newspaper className="w-5 h-5 text-ono-orange" />;
   }
@@ -79,6 +87,14 @@ export default function UploadPage() {
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState('');
   const [autoFavorite, setAutoFavorite] = useState(false);
+
+  // Tab mode: files or link
+  const [uploadMode, setUploadMode] = useState<'files' | 'link'>('files');
+  // Link form state
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkTitle, setLinkTitle] = useState('');
+  const [linkNotes, setLinkNotes] = useState('');
+  const [savingLink, setSavingLink] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, 'pending' | 'uploading' | 'done' | 'error'>>({});
@@ -482,6 +498,43 @@ export default function UploadPage() {
     setSavingInitiative(false);
   };
 
+  const handleCreateLink = async () => {
+    if (!linkUrl || !linkTitle || !selectedSlug || !selectedWorkspace) return;
+    setSavingLink(true);
+    try {
+      const res = await fetch('/api/assets/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: selectedWorkspace,
+          slug_id: selectedSlug,
+          initiative_id: selectedInitiative || undefined,
+          title: linkTitle,
+          url: linkUrl,
+          notes: linkNotes || undefined,
+          domain_context: domainContext || undefined,
+          platforms: selectedPlatforms.length > 0 ? selectedPlatforms : undefined,
+          tags: selectedTags.length > 0 ? selectedTags : undefined,
+          asset_type: assetType,
+          upload_date: uploadDate,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+        }),
+      });
+      if (res.ok) {
+        showSuccess('הקישור נשמר בהצלחה');
+        setLinkUrl('');
+        setLinkTitle('');
+        setLinkNotes('');
+      } else {
+        const data = await res.json();
+        showError('שגיאה בשמירת הקישור', data.error || '');
+      }
+    } catch {
+      showError('שגיאת רשת', 'לא ניתן לשמור את הקישור. בדוק את חיבור האינטרנט.');
+    }
+    setSavingLink(false);
+  };
+
   const zipCount = files.filter(f => f.type.includes('zip') || f.name.endsWith('.zip')).length;
 
   return (
@@ -489,9 +542,28 @@ export default function UploadPage() {
       <div className="flex items-center gap-3">
         <UploadIcon className="w-6 h-6 text-ono-green" />
         <h1 className="text-2xl font-bold text-ono-gray-dark">העלאת חומרים</h1>
-        <InfoTooltip text="העלו קבצים חדשים למערכת. גררו קבצים לאזור ההעלאה או לחצו לבחירה מהמחשב. קבצי ZIP ייפתחו אוטומטית." size="md" />
+        <InfoTooltip text="העלו קבצים חדשים למערכת, או הוסיפו קישור חיצוני עם תיאור." size="md" />
       </div>
 
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-ono-gray-light rounded-lg p-1">
+        <button
+          onClick={() => setUploadMode('files')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${uploadMode === 'files' ? 'bg-white shadow-sm text-ono-gray-dark' : 'text-ono-gray hover:text-ono-gray-dark'}`}
+        >
+          <UploadIcon className="w-4 h-4" />
+          העלאת קבצים
+        </button>
+        <button
+          onClick={() => setUploadMode('link')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all ${uploadMode === 'link' ? 'bg-white shadow-sm text-ono-gray-dark' : 'text-ono-gray hover:text-ono-gray-dark'}`}
+        >
+          <LinkIcon className="w-4 h-4" />
+          הוספת קישור
+        </button>
+      </div>
+
+      {uploadMode === 'files' && <>
       {/* Drop zone */}
       <div
         onDragOver={e => e.preventDefault()}
@@ -502,13 +574,13 @@ export default function UploadPage() {
         <UploadIcon className="w-12 h-12 text-ono-green mx-auto mb-4" />
         <p className="text-ono-gray-dark font-medium mb-1">גררו קבצים לכאן או לחצו לבחירה</p>
         <p className="text-sm text-ono-green font-medium">ניתן להעלות מספר קבצים במקביל</p>
-        <p className="text-sm text-ono-gray mt-1">תמונות, וידאו, PDF, ידיעונים (InDesign, AI, HTML, PPTX, DOCX), ZIP — עד 50MB לקובץ</p>
+        <p className="text-sm text-ono-gray mt-1">תמונות, וידאו, PDF, מסמכים, ידיעונים (InDesign, AI, HTML, PPTX), ZIP — עד 50MB לקובץ</p>
         <p className="text-xs text-ono-orange mt-2">קבצי ZIP ייפתחו אוטומטית — כל קובץ מוכר בתוכם יועלה בנפרד</p>
         <input
           id="file-input"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.tif,.heic,.heif,.avif,.mp4,.mov,.webm,.avi,.mpeg,.mpg,.mkv,.3gp,.ogg,.pdf,.zip,.indd,.ai,.eps,.pub,.html,.htm,.pptx,.ppt,.docx,.doc,.idml"
+          accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.tif,.heic,.heif,.avif,.mp4,.mov,.webm,.avi,.mpeg,.mpg,.mkv,.3gp,.ogg,.pdf,.zip,.indd,.ai,.eps,.pub,.html,.htm,.pptx,.ppt,.docx,.doc,.idml,.txt,.rtf,.odt,.pages"
           className="hidden"
           onChange={handleFileInput}
         />
@@ -804,6 +876,138 @@ export default function UploadPage() {
               </span>
             ) : (
               `העלה ${files.length} קבצים`
+            )}
+          </Button>
+        </div>
+      )}
+
+      </>}
+
+      {/* Link Form */}
+      {uploadMode === 'link' && (
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <ExternalLink className="w-5 h-5 text-purple-600" />
+            <h3 className="font-bold text-ono-gray-dark">הוספת קישור חיצוני</h3>
+          </div>
+          <p className="text-sm text-ono-gray">הוסיפו קישור לעמוד חיצוני עם תיאור. הקישור יופיע כנכס בספריית החומרים.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <Label className="flex items-center gap-1">כתובת URL *</Label>
+              <Input dir="ltr" className="mt-1 text-left font-mono" placeholder="https://example.com/page" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} />
+            </div>
+
+            <div className="md:col-span-2">
+              <Label className="flex items-center gap-1">כותרת *</Label>
+              <Input className="mt-1" placeholder="שם תיאורי לקישור" value={linkTitle} onChange={e => setLinkTitle(e.target.value)} />
+            </div>
+
+            <div className="md:col-span-2">
+              <Label>תיאור (אופציונלי)</Label>
+              <textarea className="w-full mt-1 border border-[#E8E8E8] rounded-md p-2 text-sm min-h-[80px] resize-y" placeholder="תיאור קצר של מה שנמצא בקישור..." value={linkNotes} onChange={e => setLinkNotes(e.target.value)} />
+            </div>
+
+            {workspaces.length > 1 && (
+              <div>
+                <Label>סביבת עבודה</Label>
+                <select value={selectedWorkspace} onChange={e => setSelectedWorkspace(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                  {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <Label className="flex items-center gap-1">סלאג * <InfoTooltip text="הסלאג מייצג את התחום שאליו שייך הקישור." /></Label>
+              <select value={selectedSlug} onChange={e => { setSelectedSlug(e.target.value); setSelectedInitiative(''); }} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">בחר סלאג...</option>
+                {slugs.filter(s => !s.is_archived).map(s => (
+                  <option key={s.id} value={s.id}>{s.display_name} ({s.slug})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label>קמפיין (אופציונלי)</Label>
+              <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">ללא קמפיין</option>
+                {filteredInitiatives.map(i => (
+                  <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label>סוג תוכן</Label>
+              <select value={domainContext} onChange={e => setDomainContext(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">בחר...</option>
+                {DOMAIN_CONTEXTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <Label className="flex items-center gap-1">תגיות</Label>
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
+                {selectedTags.map(tag => (
+                  <Badge key={tag} className="bg-ono-green-light text-ono-green-dark border border-ono-green/30 text-xs cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-colors" onClick={() => setSelectedTags(prev => prev.filter(t => t !== tag))}>
+                    {tag} <X className="w-3 h-3 mr-1" />
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="relative">
+              <Input
+                className="mt-1"
+                placeholder="הקלידו לחיפוש או הוספת תגית..."
+                value={tagInput}
+                onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                onFocus={() => setShowTagSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && tagInput.trim()) {
+                    e.preventDefault();
+                    const newTag = tagInput.trim();
+                    if (!selectedTags.includes(newTag)) setSelectedTags(prev => [...prev, newTag]);
+                    setTagInput('');
+                    setShowTagSuggestions(false);
+                  }
+                }}
+              />
+              {showTagSuggestions && (tagInput || availableTags.length > 0) && (
+                <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-40 overflow-auto">
+                  {availableTags
+                    .filter(t => !selectedTags.includes(t) && (!tagInput || t.includes(tagInput)))
+                    .slice(0, 10)
+                    .map(tag => (
+                      <button key={tag} type="button" className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tag]); setTagInput(''); setShowTagSuggestions(false); }}>{tag}</button>
+                    ))}
+                  {tagInput.trim() && !availableTags.includes(tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
+                    <button type="button" className="w-full text-right px-3 py-1.5 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors border-t border-[#E8E8E8]" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tagInput.trim()]); setTagInput(''); setShowTagSuggestions(false); }}>
+                      + הוסף &quot;{tagInput.trim()}&quot;
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Button
+            onClick={handleCreateLink}
+            disabled={savingLink || !selectedSlug || !linkUrl || !linkTitle}
+            className="bg-purple-600 hover:bg-purple-700 text-white w-full py-3"
+          >
+            {savingLink ? (
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                שומר...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <LinkIcon className="w-4 h-4" />
+                שמור קישור
+              </span>
             )}
           </Button>
         </div>

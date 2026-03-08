@@ -44,7 +44,7 @@ export interface Asset {
   initiative_id: string | null;
   original_filename: string;
   stored_filename: string | null;
-  file_type: 'image' | 'video' | 'pdf' | 'newsletter' | 'other';
+  file_type: 'image' | 'video' | 'pdf' | 'newsletter' | 'brief' | 'link' | 'other';
   mime_type: string | null;
   file_size_bytes: number | null;
   file_size_label: string | null;
@@ -74,6 +74,8 @@ export interface Asset {
   archived_at: string | null;
   // Duplicate detection
   file_hash: string | null;
+  // Link assets
+  external_url: string | null;
   // Joined relations
   slug?: Slug;
   initiative?: Initiative;

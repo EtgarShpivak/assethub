@@ -195,6 +195,31 @@ export const translations: Record<Locale, Record<string, string>> = {
     'sidebar.mediaManagement': 'ניהול מדיה',
     'sidebar.onoAcademic': 'הקריה האקדמית אונו',
 
+    // File types
+    'fileType.image': 'תמונה',
+    'fileType.video': 'וידאו',
+    'fileType.pdf': 'PDF',
+    'fileType.newsletter': 'ידיעונים וברושורים',
+    'fileType.brief': 'בריפים',
+    'fileType.link': 'קישורים',
+    'fileType.other': 'אחר',
+
+    // Upload
+    'upload.tabs.files': 'העלאת קבצים',
+    'upload.tabs.link': 'הוספת קישור',
+    'upload.link.title': 'הוספת קישור חיצוני',
+    'upload.link.urlLabel': 'כתובת URL',
+    'upload.link.titleLabel': 'כותרת',
+    'upload.link.notesLabel': 'תיאור',
+    'upload.link.save': 'שמור קישור',
+    'upload.link.saving': 'שומר...',
+    'upload.link.success': 'הקישור נשמר בהצלחה',
+    'upload.link.error': 'שגיאה בשמירת הקישור',
+
+    // Link assets
+    'assets.openLink': 'פתח קישור',
+    'assets.linkLabel': 'קישור',
+
     // Statuses
     'status.active': 'פעיל',
     'status.ongoing': 'מתמשך',
@@ -410,6 +435,31 @@ export const translations: Record<Locale, Record<string, string>> = {
     // Sidebar
     'sidebar.mediaManagement': 'Media Management',
     'sidebar.onoAcademic': 'Ono Academic College',
+
+    // File types
+    'fileType.image': 'Image',
+    'fileType.video': 'Video',
+    'fileType.pdf': 'PDF',
+    'fileType.newsletter': 'Newsletters & Brochures',
+    'fileType.brief': 'Briefs',
+    'fileType.link': 'Links',
+    'fileType.other': 'Other',
+
+    // Upload
+    'upload.tabs.files': 'Upload Files',
+    'upload.tabs.link': 'Add Link',
+    'upload.link.title': 'Add External Link',
+    'upload.link.urlLabel': 'URL',
+    'upload.link.titleLabel': 'Title',
+    'upload.link.notesLabel': 'Description',
+    'upload.link.save': 'Save Link',
+    'upload.link.saving': 'Saving...',
+    'upload.link.success': 'Link saved successfully',
+    'upload.link.error': 'Error saving link',
+
+    // Link assets
+    'assets.openLink': 'Open Link',
+    'assets.linkLabel': 'Link',
 
     // Statuses
     'status.active': 'Active',

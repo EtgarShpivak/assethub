@@ -1,11 +1,37 @@
 # AssetHub - System Documentation / תיעוד מערכת
 
-> **Version / גרסה: 7.0.1**
+> **Version / גרסה: 7.2.0**
 > **Last Updated / עדכון אחרון: 2026-03-07**
 
 ---
 
 ## Changelog / יומן שינויים
+
+### v7.2.0 — Briefs & Links (2026-03-07)
+
+**New Asset Types / סוגי נכסים חדשים:**
+- **Briefs (בריפים)**: New file_type for document uploads (DOCX, DOC, TXT, RTF, ODT). Auto-detected by file extension.
+- **Links (קישורים)**: URL-only assets — no file upload, just a URL + title + description. Shown with purple ExternalLink icon.
+
+**Upload Page Enhancements / שדרוגי דף העלאה:**
+- Tab switcher: "העלאת קבצים" / "הוספת קישור" — two modes on the upload page
+- Link creation form with URL validation, title, description, and all standard classification fields
+- Brief file extensions (docx, doc, txt, rtf, odt, pages) accepted and auto-classified
+
+**Asset Display / תצוגת נכסים:**
+- Brief assets show ScrollText icon (sky blue)
+- Link assets show ExternalLink icon (purple) with domain badge
+- Link cards: "Open Link" button instead of "Download"
+- Detail modal: clickable URL, "פתח קישור" button for link assets
+
+**API:**
+- `POST /api/assets/link` — create link-type assets
+- Updated prepare route: brief extension detection (docx/doc moved from newsletter to brief)
+- New `external_url` column on assets table
+
+**DB Migration:** `supabase/migrations/20260307_briefs_and_links.sql`
+
+---
 
 ### v7.0.1 — QA Fixes (2026-03-07)
 

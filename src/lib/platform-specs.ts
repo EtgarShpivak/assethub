@@ -55,6 +55,8 @@ export const FILE_TYPES = [
   { value: 'video', label: 'וידאו' },
   { value: 'pdf', label: 'PDF' },
   { value: 'newsletter', label: 'ידיעונים וברושורים' },
+  { value: 'brief', label: 'בריפים' },
+  { value: 'link', label: 'קישורים' },
   { value: 'other', label: 'אחר' },
 ] as const;
 
