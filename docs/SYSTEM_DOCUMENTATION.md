@@ -33,6 +33,18 @@
 
 ---
 
+### v7.2.1 — QA Fixes (2026-03-07)
+
+**Bugs Fixed / באגים שתוקנו:**
+- Tag suggestion crash: fixed type mismatch — `availableTags` now correctly typed as `{name, count}[]` matching API
+- Bulk download crash for link assets: single link opens URL; bulk ZIP skips links with info message
+- "Download All" filters out link assets with user-facing count message
+- Client-side URL validation added to link creation form (`isValidUrl()`)
+- `external_url` added to PATCH API whitelist (enables editing link URLs)
+- `external_url` added to search OR conditions (links discoverable via search)
+
+---
+
 ### v7.0.1 — QA Fixes (2026-03-07)
 
 **Bugs Fixed / באגים שתוקנו:**
