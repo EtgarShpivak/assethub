@@ -280,11 +280,29 @@ export default function AssetLibraryPage() {
     params.set('sort_dir', sortDir);
 
     try {
-      const res = await fetch(`/api/assets?${params}`);
+      // Fetch assets and filtered counts in parallel
+      const countsParams = new URLSearchParams(params);
+      countsParams.delete('page'); countsParams.delete('sort_by'); countsParams.delete('sort_dir'); countsParams.delete('limit');
+      const [res, countsRes] = await Promise.all([
+        fetch(`/api/assets?${params}`),
+        fetch(`/api/assets/counts?${countsParams}`),
+      ]);
       const data = await res.json();
       setAssets(data.assets || []);
       setTotal(data.total || 0);
       if (data.uploaders) setUploaders(data.uploaders);
+      const counts = await countsRes.json().catch(() => null);
+      if (counts && !counts.error) {
+        setFilterCounts({
+          file_types: counts.file_types || {},
+          platforms: counts.platforms || {},
+          aspect_ratios: counts.aspect_ratios || {},
+          domain_contexts: counts.domain_contexts || {},
+          asset_types: counts.asset_types || {},
+          slugs: counts.slugs || {},
+          initiatives: counts.initiatives || {},
+        });
+      }
     } catch {
       _showError('שגיאה בטעינת חומרים', 'לא ניתן היה לטעון את הנתונים מהשרת.', 'רענן את הדף ונסה שוב. אם הבעיה נמשכת, פנה למנהל המערכת.');
       logClientError('assets-fetch', 'Failed to fetch assets');
@@ -296,7 +314,7 @@ export default function AssetLibraryPage() {
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
-  // Load slugs, initiatives, tags, and filter counts once
+  // Load slugs, initiatives, tags, and global total once
   useEffect(() => {
     Promise.all([
       fetch('/api/slugs').then(r => r.json()),
@@ -307,18 +325,7 @@ export default function AssetLibraryPage() {
       setSlugs(sl);
       setInitiatives(ini);
       setAvailableTags(tags || []);
-      if (counts && !counts.error) {
-        setFilterCounts({
-          file_types: counts.file_types || {},
-          platforms: counts.platforms || {},
-          aspect_ratios: counts.aspect_ratios || {},
-          domain_contexts: counts.domain_contexts || {},
-          asset_types: counts.asset_types || {},
-          slugs: counts.slugs || {},
-          initiatives: counts.initiatives || {},
-        });
-        if (counts.total) setGlobalTotal(counts.total);
-      }
+      if (counts && counts.total) setGlobalTotal(counts.total);
       initialLoad.current = false;
     });
   }, []);
