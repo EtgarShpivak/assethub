@@ -1,11 +1,25 @@
 # AssetHub - System Documentation / תיעוד מערכת
 
-> **Version / גרסה: 7.2.0**
-> **Last Updated / עדכון אחרון: 2026-03-07**
+> **Version / גרסה: 7.3.0**
+> **Last Updated / עדכון אחרון: 2026-03-08**
 
 ---
 
 ## Changelog / יומן שינויים
+
+### v7.3.0 — Dynamic Faceted Counts & Saved Search UX (2026-03-08)
+
+**Dynamic Faceted Counts / ספירות דינמיות בסינון:**
+- Sidebar filter counts now update dynamically when search/filters change (faceted search)
+- `/api/assets/counts` accepts all filter params (slug, initiative, file_type, platform, search, tags, dates, etc.)
+- Counts fetched in parallel with main assets query — no additional latency
+- Header badge shows "X מתוך Y חומרים" when filters are active
+
+**Saved Searches UX / חיפושים שמורים:**
+- Prominent "שמור חיפוש" button with BookmarkPlus icon in main toolbar (green, visible when filters active)
+- Previously hidden in sidebar as a small icon — now clearly accessible above the asset grid
+
+---
 
 ### v7.2.0 — Briefs & Links (2026-03-07)
 
