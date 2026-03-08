@@ -153,6 +153,7 @@ export default function AssetLibraryPage() {
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [total, setTotal] = useState(0);
+  const [globalTotal, setGlobalTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [slugs, setSlugs] = useState<Slug[]>([]);
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
@@ -316,6 +317,7 @@ export default function AssetLibraryPage() {
           slugs: counts.slugs || {},
           initiatives: counts.initiatives || {},
         });
+        if (counts.total) setGlobalTotal(counts.total);
       }
       initialLoad.current = false;
     });
@@ -833,7 +835,9 @@ export default function AssetLibraryPage() {
             <h1 className="text-2xl font-bold text-ono-gray-dark">
               {showMyAssets ? 'הנכסים שלי' : showFavoritesOnly ? 'מועדפים' : 'ספריית חומרים'}
             </h1>
-            <Badge variant="outline" className="text-xs">{total} חומרים</Badge>
+            <Badge variant="outline" className="text-xs">
+              {hasActiveFilters && globalTotal > 0 ? `${total} מתוך ${globalTotal} חומרים` : `${total} חומרים`}
+            </Badge>
             <InfoTooltip text="כאן מוצגים כל החומרים השיווקיים. ניתן לסנן, לחפש, להוריד ולשתף. לחצו על חומר לפרטים מלאים." size="md" />
           </div>
           <div className="flex items-center gap-2">
@@ -921,18 +925,26 @@ export default function AssetLibraryPage() {
           </div>
         </div>
 
-        {/* Saved searches */}
-        {savedSearches.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Bookmark className="w-4 h-4 text-ono-gray shrink-0" />
-            {savedSearches.map(ss => (
-              <div key={ss.id} className="flex items-center gap-0.5">
-                <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => applySavedSearch(ss)}>{ss.name}</Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteSavedSearch(ss.id)}><X className="w-3 h-3 text-ono-gray" /></Button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Saved searches + save button */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {savedSearches.length > 0 && (
+            <>
+              <Bookmark className="w-4 h-4 text-ono-gray shrink-0" />
+              {savedSearches.map(ss => (
+                <div key={ss.id} className="flex items-center gap-0.5">
+                  <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => applySavedSearch(ss)}>{ss.name}</Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteSavedSearch(ss.id)}><X className="w-3 h-3 text-ono-gray" /></Button>
+                </div>
+              ))}
+            </>
+          )}
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" className="text-xs h-7 px-2 border-ono-green text-ono-green hover:bg-ono-green-light" onClick={() => setShowSaveDialog(true)}>
+              <BookmarkPlus className="w-3.5 h-3.5 ml-1" />
+              שמור חיפוש
+            </Button>
+          )}
+        </div>
 
         {/* Bulk actions */}
         {selectedAssets.size > 0 && (
