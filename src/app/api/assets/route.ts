@@ -193,12 +193,13 @@ export async function GET(request: NextRequest) {
       const matchedSlugIds = (slugMatch.data || []).map(s => s.id);
       const matchedInitIds = (initMatch.data || []).map(i => i.id);
 
-      // Build OR conditions: text fields + matching slug/initiative IDs + PDF text content
+      // Build OR conditions: text fields + matching slug/initiative IDs + PDF text content + external URLs
       const orParts = [
         `original_filename.ilike.%${sanitized}%`,
         `notes.ilike.%${sanitized}%`,
         `stored_filename.ilike.%${sanitized}%`,
         `text_content.ilike.%${sanitized}%`,
+        `external_url.ilike.%${sanitized}%`,
       ];
       if (matchedSlugIds.length > 0) {
         orParts.push(`slug_id.in.(${matchedSlugIds.join(',')})`);

@@ -494,15 +494,33 @@ export default function AssetLibraryPage() {
     const selectedArray = Array.from(selectedAssets);
     if (selectedArray.length === 1) {
       const asset = assets.find(a => a.id === selectedArray[0]);
-      if (asset) { handleDownloadSingle(asset); return; }
+      if (asset) {
+        // Link assets open in new tab instead of downloading
+        if (asset.file_type === 'link' && asset.external_url) {
+          window.open(asset.external_url, '_blank');
+          return;
+        }
+        handleDownloadSingle(asset);
+        return;
+      }
     }
+    // Filter out link assets from bulk download
+    const downloadableIds = selectedArray.filter(id => {
+      const a = assets.find(x => x.id === id);
+      return a && a.file_type !== 'link';
+    });
+    if (downloadableIds.length === 0) {
+      showToast('קישורים לא ניתנים להורדה כקבצים', 'info');
+      return;
+    }
+    const skippedLinks = selectedArray.length - downloadableIds.length;
     setDownloading(true);
-    showToast(`מכין ZIP עם ${selectedArray.length} קבצים...`, 'info');
+    showToast(`מכין ZIP עם ${downloadableIds.length} קבצים...${skippedLinks > 0 ? ` (${skippedLinks} קישורים לא כלולים)` : ''}`, 'info');
     try {
       const res = await fetch('/api/assets/download-zip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset_ids: selectedArray }),
+        body: JSON.stringify({ asset_ids: downloadableIds }),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -555,10 +573,18 @@ export default function AssetLibraryPage() {
 
       const listRes = await fetch(`/api/assets?${params}`);
       const listData = await listRes.json();
-      const allIds = (listData.assets || []).map((a: Asset) => a.id);
-      if (allIds.length === 0) { setDownloading(false); return; }
+      // Filter out link assets — they have no files to download
+      const downloadableAssets = (listData.assets || []).filter((a: Asset) => a.file_type !== 'link');
+      const linkCount = (listData.assets || []).length - downloadableAssets.length;
+      const allIds = downloadableAssets.map((a: Asset) => a.id);
+      if (allIds.length === 0) {
+        setDownloading(false);
+        if (linkCount > 0) showToast(`${linkCount} קישורים לא ניתנים להורדה — פתח אותם ישירות`, 'info');
+        return;
+      }
+      if (linkCount > 0) showToast(`${linkCount} קישורים דולגו — רק קבצים נכללים בהורדה`, 'info');
       if (allIds.length === 1) {
-        const asset = listData.assets[0];
+        const asset = downloadableAssets[0];
         setDownloading(false);
         handleDownloadSingle(asset);
         return;

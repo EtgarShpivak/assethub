@@ -42,7 +42,7 @@ export async function PATCH(
   // Whitelist allowed fields
   const ALLOWED_FIELDS = new Set([
     'tags', 'platforms', 'domain_context', 'initiative_id', 'asset_type',
-    'notes', 'slug_id', 'expires_at', 'license_notes', 'is_archived',
+    'notes', 'slug_id', 'expires_at', 'license_notes', 'is_archived', 'external_url',
   ]);
   const sanitized: Record<string, unknown> = {};
   for (const key of Object.keys(body)) {

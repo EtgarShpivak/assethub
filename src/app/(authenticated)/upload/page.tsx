@@ -79,7 +79,7 @@ export default function UploadPage() {
   const [domainContext, setDomainContext] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [assetType, setAssetType] = useState('production');
@@ -498,8 +498,16 @@ export default function UploadPage() {
     setSavingInitiative(false);
   };
 
+  const isValidUrl = (url: string) => {
+    try { new URL(url); return true; } catch { return false; }
+  };
+
   const handleCreateLink = async () => {
     if (!linkUrl || !linkTitle || !selectedSlug || !selectedWorkspace) return;
+    if (!isValidUrl(linkUrl)) {
+      showError('כתובת URL לא תקינה', 'יש להזין כתובת מלאה, למשל: https://example.com');
+      return;
+    }
     setSavingLink(true);
     try {
       const res = await fetch('/api/assets/link', {
@@ -769,24 +777,24 @@ export default function UploadPage() {
               {showTagSuggestions && (tagInput || availableTags.length > 0) && (
                 <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-40 overflow-auto">
                   {availableTags
-                    .filter(t => !selectedTags.includes(t) && (!tagInput || t.includes(tagInput)))
+                    .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
                     .slice(0, 10)
                     .map(tag => (
                       <button
-                        key={tag}
+                        key={tag.name}
                         type="button"
                         className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors"
                         onMouseDown={e => {
                           e.preventDefault();
-                          setSelectedTags(prev => [...prev, tag]);
+                          setSelectedTags(prev => [...prev, tag.name]);
                           setTagInput('');
                           setShowTagSuggestions(false);
                         }}
                       >
-                        {tag}
+                        {tag.name}
                       </button>
                     ))}
-                  {tagInput.trim() && !availableTags.includes(tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
+                  {tagInput.trim() && !availableTags.some(t => t.name === tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
                     <button
                       type="button"
                       className="w-full text-right px-3 py-1.5 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors border-t border-[#E8E8E8]"
@@ -800,7 +808,7 @@ export default function UploadPage() {
                       + הוסף &quot;{tagInput.trim()}&quot;
                     </button>
                   )}
-                  {availableTags.filter(t => !selectedTags.includes(t) && (!tagInput || t.includes(tagInput))).length === 0 && !tagInput.trim() && (
+                  {availableTags.filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput))).length === 0 && !tagInput.trim() && (
                     <p className="px-3 py-2 text-xs text-ono-gray">אין תגיות עדיין. הקלידו להוספת תגית חדשה.</p>
                   )}
                 </div>
@@ -978,12 +986,12 @@ export default function UploadPage() {
               {showTagSuggestions && (tagInput || availableTags.length > 0) && (
                 <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-40 overflow-auto">
                   {availableTags
-                    .filter(t => !selectedTags.includes(t) && (!tagInput || t.includes(tagInput)))
+                    .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
                     .slice(0, 10)
                     .map(tag => (
-                      <button key={tag} type="button" className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tag]); setTagInput(''); setShowTagSuggestions(false); }}>{tag}</button>
+                      <button key={tag.name} type="button" className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tag.name]); setTagInput(''); setShowTagSuggestions(false); }}>{tag.name}</button>
                     ))}
-                  {tagInput.trim() && !availableTags.includes(tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
+                  {tagInput.trim() && !availableTags.some(t => t.name === tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
                     <button type="button" className="w-full text-right px-3 py-1.5 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors border-t border-[#E8E8E8]" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tagInput.trim()]); setTagInput(''); setShowTagSuggestions(false); }}>
                       + הוסף &quot;{tagInput.trim()}&quot;
                     </button>
