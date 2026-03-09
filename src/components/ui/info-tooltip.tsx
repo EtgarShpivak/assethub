@@ -55,8 +55,12 @@ export function InfoTooltip({ text, size = 'sm', className = '' }: InfoTooltipPr
 
   const iconSize = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
 
+  const tooltipId = `tooltip-${text.slice(0, 10).replace(/\s/g, '')}`;
+
   const tooltip = show && mounted ? createPortal(
     <div
+      id={tooltipId}
+      role="tooltip"
       className="fixed z-[9999] w-56 bg-ono-gray-dark text-white text-xs rounded-lg p-3 shadow-xl leading-relaxed pointer-events-none"
       style={{
         direction: 'rtl',
@@ -80,6 +84,7 @@ export function InfoTooltip({ text, size = 'sm', className = '' }: InfoTooltipPr
         onMouseLeave={() => setShow(false)}
         className="text-ono-gray/60 hover:text-ono-green transition-colors cursor-help"
         aria-label="עזרה"
+        aria-describedby={show ? tooltipId : undefined}
       >
         <HelpCircle className={iconSize} />
       </button>

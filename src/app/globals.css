@@ -86,3 +86,117 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ono-gray-dark);
 }
+
+/* ===== Accessibility Toolbar Modes ===== */
+
+/* High Contrast Mode */
+.a11y-high-contrast {
+  --ono-gray-light: #000000;
+  --ono-white: #000000;
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 5%;
+  --popover-foreground: 0 0% 100%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 85%;
+  --border: 0 0% 40%;
+}
+
+.a11y-high-contrast body {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+.a11y-high-contrast header,
+.a11y-high-contrast aside,
+.a11y-high-contrast .bg-white {
+  background: #111 !important;
+  color: #fff !important;
+  border-color: #555 !important;
+}
+
+.a11y-high-contrast a,
+.a11y-high-contrast button {
+  color: #FFD700 !important;
+}
+
+.a11y-high-contrast a:hover,
+.a11y-high-contrast button:hover {
+  color: #FFF !important;
+}
+
+.a11y-high-contrast h1,
+.a11y-high-contrast h2,
+.a11y-high-contrast h3,
+.a11y-high-contrast h4,
+.a11y-high-contrast h5,
+.a11y-high-contrast h6 {
+  color: #fff !important;
+}
+
+.a11y-high-contrast p,
+.a11y-high-contrast span,
+.a11y-high-contrast li,
+.a11y-high-contrast td,
+.a11y-high-contrast th,
+.a11y-high-contrast label {
+  color: #e0e0e0 !important;
+}
+
+.a11y-high-contrast input,
+.a11y-high-contrast select,
+.a11y-high-contrast textarea {
+  background: #222 !important;
+  color: #fff !important;
+  border-color: #666 !important;
+}
+
+/* Grayscale Mode */
+.a11y-grayscale {
+  filter: grayscale(100%);
+}
+
+/* Link Highlighting */
+.a11y-link-highlight a {
+  text-decoration: underline !important;
+  outline: 2px solid currentColor !important;
+  outline-offset: 2px !important;
+}
+
+/* Readable Font */
+.a11y-readable-font,
+.a11y-readable-font * {
+  font-family: Arial, Helvetica, sans-serif !important;
+  letter-spacing: 0.03em !important;
+  word-spacing: 0.1em !important;
+}
+
+/* Pause Animations */
+.a11y-pause-animations,
+.a11y-pause-animations * {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Enhanced focus visibility for all interactive elements */
+*:focus-visible {
+  outline: 2px solid var(--ono-green, #8BBF3C) !important;
+  outline-offset: 2px !important;
+}
+
+/* Screen reader only class (built into Tailwind as sr-only but making it explicit) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

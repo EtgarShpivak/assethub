@@ -1,11 +1,90 @@
 # AssetHub - System Documentation / תיעוד מערכת
 
-> **Version / גרסה: 7.3.0**
-> **Last Updated / עדכון אחרון: 2026-03-08**
+> **Version / גרסה: 7.4.0**
+> **Last Updated / עדכון אחרון: 2026-03-09**
 
 ---
 
 ## Changelog / יומן שינויים
+
+### v7.4.0 — Israeli Accessibility Compliance / תאימות נגישות ישראלית (2026-03-09)
+
+Full compliance with Israeli Standard 5568 (IS 5568) and WCAG 2.1 Level AA.
+
+**Accessibility Toolbar / סרגל נגישות:**
+- Floating accessibility button (♿) with toolbar panel
+- Font size controls (increase/decrease, 5 levels)
+- High contrast mode (dark background, light text, gold links)
+- Grayscale mode
+- Link highlighting (underline + outline all links)
+- Readable font mode (Arial, increased letter/word spacing)
+- Pause animations mode (disables all CSS transitions/animations)
+- Settings persisted in localStorage across sessions
+- Full Hebrew & English i18n support
+
+**Skip Navigation / דילוג ניווט:**
+- "Skip to main content" link visible on Tab focus
+- `id="main-content"` on `<main>` element with `role="main"`
+
+**Accessibility Statement / הצהרת נגישות (mandatory under Israeli law):**
+- New `/accessibility` page with full compliance declaration
+- Compliance standard reference (IS 5568, WCAG 2.1 AA)
+- List of accessibility features implemented
+- Keyboard navigation instructions
+- Known limitations disclosure
+- Assistive technology compatibility statement
+- Accessibility coordinator contact info (name, email, phone)
+- Feedback mechanism with 60-day remediation notice
+- Added to sidebar navigation
+
+**ARIA & Semantic HTML Fixes:**
+- `role="banner"` on header, `role="main"` on main content area
+- `aria-label` on sidebar navigation, search button, language toggle
+- `aria-current="page"` on active sidebar links
+- `aria-expanded` on collapsible sidebar groups
+- `role="tooltip"` and `aria-describedby` on InfoTooltip component
+- `aria-hidden="true"` on decorative icons (Globe, Search, Sparkles, etc.)
+- `role="alert"` / `role="status"` with `aria-live` regions on toast notifications
+- `aria-atomic="true"` on toast messages for screen reader announcements
+- `aria-label` on toast close buttons
+
+**Image Accessibility / נגישות תמונות:**
+- Meaningful `alt` text on all asset thumbnails (uses `original_filename`)
+- Fixed empty `alt=""` on similar-assets and collections thumbnails
+
+**Keyboard & Focus / מקלדת ופוקוס:**
+- Enhanced global `*:focus-visible` with green outline (2px, 2px offset)
+- All toolbar controls are keyboard-accessible with visible focus rings
+- Toggle switches use `role="switch"` with `aria-checked`
+
+**CSS Accessibility Modes (globals.css):**
+- `.a11y-high-contrast` — full high-contrast theme
+- `.a11y-grayscale` — grayscale filter
+- `.a11y-link-highlight` — link underline + outline
+- `.a11y-readable-font` — Arial font with spacing
+- `.a11y-pause-animations` — disables all animations/transitions
+
+**i18n / תרגומים:**
+- 45+ new translation keys for accessibility features (HE + EN)
+- Accessibility toolbar, statement page, ARIA labels all translated
+
+**Files Added:**
+- `src/components/accessibility/accessibility-toolbar.tsx`
+- `src/components/accessibility/skip-navigation.tsx`
+- `src/app/(authenticated)/accessibility/page.tsx`
+
+**Files Modified:**
+- `src/components/layout/app-layout.tsx` — skip nav, toolbar, main landmark
+- `src/components/layout/sidebar.tsx` — aria-current, aria-expanded, nav aria-label, accessibility link
+- `src/components/layout/top-nav.tsx` — role="banner", aria-labels, aria-hidden
+- `src/components/ui/global-toast.tsx` — role="alert"/role="status", aria-live
+- `src/components/ui/info-tooltip.tsx` — role="tooltip", aria-describedby
+- `src/components/assets/similar-assets.tsx` — alt text, aria-hidden
+- `src/app/(authenticated)/collections/page.tsx` — alt text
+- `src/lib/i18n/translations.ts` — 45+ new keys
+- `src/app/globals.css` — accessibility CSS modes, enhanced focus-visible
+
+---
 
 ### v7.3.0 — Dynamic Faceted Counts & Saved Search UX (2026-03-08)
 

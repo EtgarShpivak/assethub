@@ -37,11 +37,11 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
   };
 
   return (
-    <header className="h-14 bg-white border-b border-[#E8E8E8] flex items-center justify-between px-6 shrink-0">
+    <header role="banner" className="h-14 bg-white border-b border-[#E8E8E8] flex items-center justify-between px-6 shrink-0">
       {/* Logo on the right (RTL) */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-ono-green rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-ono-green rounded-lg flex items-center justify-center" aria-hidden="true">
             <span className="text-white font-bold text-sm">AH</span>
           </div>
           <span className="font-bold text-lg text-ono-gray-dark">{t('nav.mediaManagement')}</span>
@@ -51,9 +51,10 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
       {/* Center: search trigger */}
       <button
         onClick={openSearch}
+        aria-label={t('a11y.openSearch')}
         className="flex items-center gap-2 px-3 py-1.5 text-sm text-ono-gray bg-ono-gray-light rounded-lg hover:bg-[#E8E8E8] transition-colors"
       >
-        <Search className="w-4 h-4" />
+        <Search className="w-4 h-4" aria-hidden="true" />
         <span className="hidden sm:inline">{t('topnav.search')}</span>
         <kbd className="hidden sm:inline text-[10px] bg-white px-1.5 py-0.5 rounded border border-[#E8E8E8]">
           {t('topnav.searchHint')}
@@ -68,8 +69,9 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
           size="sm"
           onClick={() => setLocale(locale === 'he' ? 'en' : 'he')}
           className="text-xs gap-1"
+          aria-label={t('a11y.switchLanguage')}
         >
-          <Globe className="w-4 h-4" />
+          <Globe className="w-4 h-4" aria-hidden="true" />
           {t('topnav.language')}
         </Button>
 

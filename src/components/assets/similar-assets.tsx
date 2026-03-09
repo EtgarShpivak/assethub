@@ -30,7 +30,7 @@ export function SimilarAssets({ assetId, onSelect }: SimilarAssetsProps) {
   return (
     <div className="mt-6">
       <h3 className="text-sm font-bold text-ono-gray-dark flex items-center gap-2 mb-3">
-        <Sparkles className="w-4 h-4 text-ono-green" />
+        <Sparkles className="w-4 h-4 text-ono-green" aria-hidden="true" />
         {t('assets.similarAssets')}
       </h3>
       <div className="flex gap-3 overflow-x-auto pb-2">
@@ -43,7 +43,7 @@ export function SimilarAssets({ assetId, onSelect }: SimilarAssetsProps) {
             <div className="aspect-square bg-ono-gray-light rounded-md flex items-center justify-center overflow-hidden mb-1">
               {asset.drive_view_url && asset.file_type === 'image' ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={asset.drive_view_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                <img src={asset.drive_view_url} alt={asset.original_filename || asset.stored_filename || 'asset thumbnail'} className="w-full h-full object-cover" loading="lazy" />
               ) : (
                 <span className="text-xs text-ono-gray">{asset.file_type}</span>
               )}

@@ -37,13 +37,18 @@ function ToastItem({ toast, onClose }: { toast: ToastMessage; onClose: () => voi
 
   const Icon = config.icon;
 
+  const ariaRole = toast.type === 'error' || toast.type === 'warning' ? 'alert' : 'status';
+
   return (
     <div
       className={`${config.bg} border rounded-lg p-4 shadow-lg flex gap-3`}
       dir="rtl"
+      role={ariaRole}
+      aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
       style={{ animation: 'slideUpFade 0.3s ease-out' }}
     >
-      <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${config.iconColor}`} />
+      <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${config.iconColor}`} aria-hidden="true" />
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium ${config.titleColor}`}>{toast.title}</p>
         {toast.description && (
@@ -55,8 +60,8 @@ function ToastItem({ toast, onClose }: { toast: ToastMessage; onClose: () => voi
           </p>
         )}
       </div>
-      <button onClick={onClose} className="shrink-0 p-0.5 hover:bg-black/5 rounded">
-        <X className="w-4 h-4 text-gray-400" />
+      <button onClick={onClose} className="shrink-0 p-0.5 hover:bg-black/5 rounded" aria-label="סגור הודעה">
+        <X className="w-4 h-4 text-gray-400" aria-hidden="true" />
       </button>
     </div>
   );

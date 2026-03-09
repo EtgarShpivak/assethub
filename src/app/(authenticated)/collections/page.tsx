@@ -550,7 +550,7 @@ export default function CollectionsPage() {
                           <div className="w-10 h-10 bg-ono-gray-light rounded flex items-center justify-center shrink-0 overflow-hidden">
                             {asset.drive_view_url && asset.file_type === 'image' ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={asset.drive_view_url} alt="" className="w-full h-full object-cover" />
+                              <img src={asset.drive_view_url} alt={asset.original_filename || 'asset thumbnail'} className="w-full h-full object-cover" />
                             ) : (
                               <FileTypeIcon type={asset.file_type} size="sm" />
                             )}

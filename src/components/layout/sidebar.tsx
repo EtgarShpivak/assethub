@@ -20,6 +20,7 @@ import {
   Star,
   UserCircle,
   BarChart3,
+  Accessibility,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n/provider';
@@ -71,6 +72,7 @@ const navEntries: NavEntry[] = [
     ],
   },
   { href: '/help', labelKey: 'nav.help', icon: HelpCircle },
+  { href: '/accessibility', labelKey: 'nav.accessibility', icon: Accessibility },
 ];
 
 export function Sidebar({ userRole }: { userRole?: string }) {
@@ -111,6 +113,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
       <li key={item.href}>
         <Link
           href={item.href}
+          aria-current={isActive ? 'page' : undefined}
           className={cn(
             'flex items-center gap-3 text-sm transition-colors',
             isChild ? 'px-5 py-2 pr-10' : 'px-4 py-2.5',
@@ -145,6 +148,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
       <li key={group.labelKey}>
         <button
           onClick={() => toggleGroup(group.labelKey)}
+          aria-expanded={isOpen}
           className={cn(
             'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors w-full text-right',
             hasActiveChild
@@ -189,7 +193,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
         </div>
       </div>
 
-      <nav className="flex-1 py-4 overflow-auto">
+      <nav aria-label={t('a11y.sidebarNav')} className="flex-1 py-4 overflow-auto">
         <ul className="space-y-0.5">
           {navEntries.map(entry =>
             isGroup(entry) ? renderGroup(entry) : renderLink(entry)
