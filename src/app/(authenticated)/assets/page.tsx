@@ -36,6 +36,8 @@ import {
   ScrollText,
   ExternalLink,
   Plus,
+  SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,6 +62,7 @@ import { VersionChain } from '@/components/assets/version-chain';
 import { PlatformSuggestion } from '@/components/assets/platform-suggestion';
 import { SimilarAssets } from '@/components/assets/similar-assets';
 import { FolderBrowser } from '@/components/assets/folder-browser';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CommentThread } from '@/components/assets/comment-thread';
 import { useComments } from '@/lib/hooks/use-comments';
 import { FolderTree } from 'lucide-react';
@@ -234,6 +237,18 @@ export default function AssetLibraryPage() {
   const [editTagInput, setEditTagInput] = useState('');
   const [showEditTagSuggestions, setShowEditTagSuggestions] = useState(false);
 
+  // Advanced search
+  type AdvancedCondition = {
+    id: string;
+    field: 'search' | 'slug' | 'campaign' | 'tag' | 'file_type' | 'platform' | 'domain_context' | 'asset_type';
+    value: string;
+    operator: 'AND' | 'OR';
+  };
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [advancedConditions, setAdvancedConditions] = useState<AdvancedCondition[]>([
+    { id: '1', field: 'search', value: '', operator: 'AND' },
+  ]);
+
   // Bulk edit
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<{
@@ -301,6 +316,11 @@ export default function AssetLibraryPage() {
     if (searchParams.get('unclassified')) params.set('unclassified', 'true');
     if (showFavoritesOnly) params.set('favorites_only', 'true');
     if (showMyAssets && userId) params.set('uploaded_by', userId);
+    // Advanced search conditions
+    const activeAdvanced = advancedConditions.filter(c => c.value.trim());
+    if (showAdvancedSearch && activeAdvanced.length > 0) {
+      params.set('advanced', JSON.stringify(activeAdvanced.map(c => ({ field: c.field, value: c.value, operator: c.operator }))));
+    }
     params.set('page', page.toString());
     params.set('sort_by', sortBy);
     params.set('sort_dir', sortDir);
@@ -336,7 +356,7 @@ export default function AssetLibraryPage() {
     setLoading(false);
   }, [searchQuery, filterSlugs, filterInitiatives, filterFileTypes, filterPlatforms,
       filterAspectRatios, filterDomainContexts, filterAssetTypes, filterDimensions,
-      filterDateFrom, filterDateTo, filterTag, filterExpiry, filterUploadedBy, page, sortBy, sortDir, searchParams, _showError, showFavoritesOnly, showMyAssets, userId]);
+      filterDateFrom, filterDateTo, filterTag, filterExpiry, filterUploadedBy, page, sortBy, sortDir, searchParams, _showError, showFavoritesOnly, showMyAssets, userId, showAdvancedSearch, advancedConditions]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -433,7 +453,8 @@ export default function AssetLibraryPage() {
   const hasActiveFilters = filterSlugs.length > 0 || filterInitiatives.length > 0 ||
     filterFileTypes.length > 0 || filterPlatforms.length > 0 || filterAspectRatios.length > 0 ||
     filterDomainContexts.length > 0 || filterAssetTypes.length > 0 ||
-    filterDimensions || filterDateFrom || filterDateTo || filterTag || filterExpiry || filterUploadedBy || searchQuery;
+    filterDimensions || filterDateFrom || filterDateTo || filterTag || filterExpiry || filterUploadedBy || searchQuery ||
+    (showAdvancedSearch && advancedConditions.some(c => c.value.trim()));
 
   const clearFilters = () => {
     setSearchQuery(''); setFilterSlugs([]); setFilterInitiatives([]);
@@ -441,6 +462,8 @@ export default function AssetLibraryPage() {
     setFilterDomainContexts([]); setFilterAssetTypes([]);
     setFilterDimensions(''); setFilterDateFrom(''); setFilterDateTo('');
     setFilterTag(''); setFilterExpiry(''); setFilterUploadedBy(''); setActiveDatePreset(''); setPage(1);
+    setShowAdvancedSearch(false);
+    setAdvancedConditions([{ id: '1', field: 'search', value: '', operator: 'AND' }]);
   };
 
   const getCurrentFilters = () => ({
@@ -971,31 +994,42 @@ export default function AssetLibraryPage() {
         <div className="flex gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray" />
-            <Input className="pr-10" placeholder="חיפוש לפי שם קובץ, סלאג, קמפיין או הערות..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <Input className="pr-10" placeholder="חיפוש לפי שם קובץ, סלאג, קמפיין, תגיות או הערות..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
-          {/* Slug quick filter */}
-          <select
+          {/* Slug quick filter — searchable */}
+          <SearchableSelect
+            className="min-w-[160px]"
+            options={slugs.filter(s => !s.is_archived).map(s => ({
+              value: s.id,
+              label: s.display_name,
+              sublabel: s.slug,
+              indent: s.slug.includes('-'),
+            }))}
             value={filterSlugs.length === 1 ? filterSlugs[0] : ''}
-            onChange={(e) => { setFilterSlugs(e.target.value ? [e.target.value] : []); setPage(1); }}
-            className="border border-[#E8E8E8] rounded-md p-2 text-sm h-10 appearance-none min-w-[140px]"
-          >
-            <option value="">כל הסלאגים</option>
-            {slugs.filter(s => !s.is_archived).map(s => (
-              <option key={s.id} value={s.id}>{s.display_name}</option>
-            ))}
-          </select>
-          {/* Campaign quick filter */}
-          <select
+            onChange={(v) => { setFilterSlugs(v ? [v] : []); setPage(1); }}
+            placeholder="חיפוש סלאג..."
+            emptyOptionLabel="כל הסלאגים"
+            emptyLabel="לא נמצאו סלאגים"
+            allowEmpty
+          />
+          {/* Campaign quick filter — searchable */}
+          <SearchableSelect
+            className="min-w-[160px]"
+            options={[
+              { value: '__no_initiative__', label: 'ללא קמפיין' },
+              ...initiatives.map(i => ({
+                value: i.id,
+                label: i.name,
+                sublabel: i.short_code,
+              })),
+            ]}
             value={filterInitiatives.length === 1 ? filterInitiatives[0] : ''}
-            onChange={(e) => { setFilterInitiatives(e.target.value ? [e.target.value] : []); setPage(1); }}
-            className="border border-[#E8E8E8] rounded-md p-2 text-sm h-10 appearance-none min-w-[140px]"
-          >
-            <option value="">כל הקמפיינים</option>
-            <option value="__no_initiative__">ללא קמפיין</option>
-            {initiatives.map(i => (
-              <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>
-            ))}
-          </select>
+            onChange={(v) => { setFilterInitiatives(v ? [v] : []); setPage(1); }}
+            placeholder="חיפוש קמפיין..."
+            emptyOptionLabel="כל הקמפיינים"
+            emptyLabel="לא נמצאו קמפיינים"
+            allowEmpty
+          />
           {/* Tag quick filter — searchable */}
           <div className="relative min-w-[160px]">
             <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
@@ -1035,7 +1069,222 @@ export default function AssetLibraryPage() {
               </div>
             )}
           </div>
+          {/* Advanced search toggle */}
+          <Button
+            variant={showAdvancedSearch ? 'default' : 'outline'}
+            size="sm"
+            className={`h-10 px-3 shrink-0 ${showAdvancedSearch ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''}`}
+            onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+            title="חיפוש מתקדם"
+          >
+            <SlidersHorizontal className="w-4 h-4 ml-1" />
+            מתקדם
+          </Button>
         </div>
+
+        {/* Advanced search panel */}
+        {showAdvancedSearch && (
+          <div className="bg-white border border-[#E8E8E8] rounded-lg p-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-ono-gray-dark flex items-center gap-1.5">
+                <SlidersHorizontal className="w-4 h-4 text-ono-green" />
+                חיפוש מתקדם
+              </h3>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-ono-gray" onClick={() => {
+                  setAdvancedConditions([{ id: '1', field: 'search', value: '', operator: 'AND' }]);
+                }}>
+                  נקה תנאים
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => setShowAdvancedSearch(false)}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-ono-gray">הגדירו תנאי חיפוש מרובים עם אופרטורים AND (וגם) / OR (או) ביניהם.</p>
+
+            <div className="space-y-2">
+              {advancedConditions.map((condition, idx) => (
+                <div key={condition.id} className="flex items-center gap-2 flex-wrap">
+                  {/* Operator (shown for 2nd row onward) */}
+                  {idx > 0 && (
+                    <select
+                      value={condition.operator}
+                      onChange={(e) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, operator: e.target.value as 'AND' | 'OR' } : c
+                        ));
+                      }}
+                      className="border border-[#E8E8E8] rounded-md px-2 py-1.5 text-xs font-bold bg-ono-gray-light w-[70px] text-center"
+                    >
+                      <option value="AND">AND</option>
+                      <option value="OR">OR</option>
+                    </select>
+                  )}
+                  {idx === 0 && <div className="w-[70px] shrink-0" />}
+
+                  {/* Field selector */}
+                  <select
+                    value={condition.field}
+                    onChange={(e) => {
+                      setAdvancedConditions(prev => prev.map(c =>
+                        c.id === condition.id ? { ...c, field: e.target.value as AdvancedCondition['field'], value: '' } : c
+                      ));
+                    }}
+                    className="border border-[#E8E8E8] rounded-md px-2 py-1.5 text-sm min-w-[130px]"
+                  >
+                    <option value="search">טקסט חופשי</option>
+                    <option value="tag">תגית</option>
+                    <option value="slug">סלאג</option>
+                    <option value="campaign">קמפיין</option>
+                    <option value="file_type">סוג קובץ</option>
+                    <option value="platform">פלטפורמה</option>
+                    <option value="domain_context">סוג תוכן</option>
+                    <option value="asset_type">סוג חומר</option>
+                  </select>
+
+                  {/* Value input — varies by field type */}
+                  {condition.field === 'search' && (
+                    <Input
+                      className="flex-1 min-w-[200px] h-[34px] text-sm"
+                      placeholder="הקלד טקסט לחיפוש..."
+                      value={condition.value}
+                      onChange={(e) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: e.target.value } : c
+                        ));
+                      }}
+                    />
+                  )}
+                  {condition.field === 'tag' && (
+                    <SearchableSelect
+                      className="flex-1 min-w-[200px]"
+                      options={availableTags.map(t => ({ value: t.name, label: t.name, sublabel: `(${t.count})` }))}
+                      value={condition.value}
+                      onChange={(v) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: v } : c
+                        ));
+                      }}
+                      placeholder="בחר תגית..."
+                      emptyLabel="לא נמצאו תגיות"
+                    />
+                  )}
+                  {condition.field === 'slug' && (
+                    <SearchableSelect
+                      className="flex-1 min-w-[200px]"
+                      options={slugs.filter(s => !s.is_archived).map(s => ({ value: s.id, label: s.display_name, sublabel: s.slug, indent: s.slug.includes('-') }))}
+                      value={condition.value}
+                      onChange={(v) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: v } : c
+                        ));
+                      }}
+                      placeholder="בחר סלאג..."
+                      emptyLabel="לא נמצאו סלאגים"
+                    />
+                  )}
+                  {condition.field === 'campaign' && (
+                    <SearchableSelect
+                      className="flex-1 min-w-[200px]"
+                      options={initiatives.map(i => ({ value: i.id, label: i.name, sublabel: i.short_code }))}
+                      value={condition.value}
+                      onChange={(v) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: v } : c
+                        ));
+                      }}
+                      placeholder="בחר קמפיין..."
+                      emptyLabel="לא נמצאו קמפיינים"
+                    />
+                  )}
+                  {condition.field === 'file_type' && (
+                    <SearchableSelect
+                      className="flex-1 min-w-[200px]"
+                      options={FILE_TYPES.map(ft => ({ value: ft.value, label: ft.label }))}
+                      value={condition.value}
+                      onChange={(v) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: v } : c
+                        ));
+                      }}
+                      placeholder="בחר סוג קובץ..."
+                      emptyLabel="לא נמצאו סוגי קבצים"
+                    />
+                  )}
+                  {condition.field === 'platform' && (
+                    <SearchableSelect
+                      className="flex-1 min-w-[200px]"
+                      options={PLATFORMS.map(p => ({ value: p.value, label: p.label }))}
+                      value={condition.value}
+                      onChange={(v) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: v } : c
+                        ));
+                      }}
+                      placeholder="בחר פלטפורמה..."
+                      emptyLabel="לא נמצאו פלטפורמות"
+                    />
+                  )}
+                  {condition.field === 'domain_context' && (
+                    <SearchableSelect
+                      className="flex-1 min-w-[200px]"
+                      options={DOMAIN_CONTEXTS.map(dc => ({ value: dc.value, label: dc.label }))}
+                      value={condition.value}
+                      onChange={(v) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: v } : c
+                        ));
+                      }}
+                      placeholder="בחר סוג תוכן..."
+                      emptyLabel="לא נמצאו סוגי תוכן"
+                    />
+                  )}
+                  {condition.field === 'asset_type' && (
+                    <SearchableSelect
+                      className="flex-1 min-w-[200px]"
+                      options={ASSET_TYPES.map(at => ({ value: at.value, label: at.label }))}
+                      value={condition.value}
+                      onChange={(v) => {
+                        setAdvancedConditions(prev => prev.map(c =>
+                          c.id === condition.id ? { ...c, value: v } : c
+                        ));
+                      }}
+                      placeholder="בחר סוג חומר..."
+                      emptyLabel="לא נמצאו סוגי חומרים"
+                    />
+                  )}
+
+                  {/* Delete condition */}
+                  {advancedConditions.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-ono-gray hover:text-red-500 shrink-0"
+                      onClick={() => setAdvancedConditions(prev => prev.filter(c => c.id !== condition.id))}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Add condition button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-8"
+              onClick={() => {
+                const newId = Date.now().toString();
+                setAdvancedConditions(prev => [...prev, { id: newId, field: 'search', value: '', operator: 'AND' }]);
+              }}
+            >
+              <Plus className="w-3.5 h-3.5 ml-1" />
+              הוסף תנאי
+            </Button>
+          </div>
+        )}
 
         {/* Saved searches + save button */}
         <div className="flex items-center gap-2 flex-wrap">

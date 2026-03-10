@@ -178,22 +178,37 @@ export async function GET(request: NextRequest) {
     query = query.lte('upload_date', dateTo + 'T23:59:59.999Z');
   }
 
-  // Search — includes filename, notes, stored_filename, slug name, initiative name
+  // Search — includes filename, notes, stored_filename, slug name, initiative name, AND tags
   const search = searchParams.get('search');
   if (search) {
     // Sanitize search input — remove PostgREST special chars to prevent filter injection
     const sanitized = search.replace(/[(),\\]/g, '').trim().slice(0, 200);
     if (sanitized) {
-      // Find slugs and initiatives matching the search term
-      const [slugMatch, initMatch] = await Promise.all([
+      // Find slugs, initiatives, and matching tags in parallel
+      const [slugMatch, initMatch, tagMatch] = await Promise.all([
         supabase.from('slugs').select('id').or(`display_name.ilike.%${sanitized}%,slug.ilike.%${sanitized}%`),
         supabase.from('initiatives').select('id').or(`name.ilike.%${sanitized}%,short_code.ilike.%${sanitized}%`),
+        // Get all unique tags to find those matching the search term (arrays can't use ilike directly)
+        supabase.from('assets').select('tags').not('tags', 'is', null),
       ]);
 
       const matchedSlugIds = (slugMatch.data || []).map(s => s.id);
       const matchedInitIds = (initMatch.data || []).map(i => i.id);
 
-      // Build OR conditions: text fields + matching slug/initiative IDs + PDF text content + external URLs
+      // Extract unique tags that match the search term
+      const tagSet = new Set<string>();
+      for (const row of tagMatch.data || []) {
+        if (Array.isArray(row.tags)) {
+          for (const t of row.tags) {
+            if (t && typeof t === 'string' && t.toLowerCase().includes(sanitized.toLowerCase())) {
+              tagSet.add(t);
+            }
+          }
+        }
+      }
+      const matchedTags = Array.from(tagSet);
+
+      // Build OR conditions: text fields + matching slug/initiative IDs + PDF text content + external URLs + tags
       const orParts = [
         `original_filename.ilike.%${sanitized}%`,
         `notes.ilike.%${sanitized}%`,
@@ -206,6 +221,12 @@ export async function GET(request: NextRequest) {
       }
       if (matchedInitIds.length > 0) {
         orParts.push(`initiative_id.in.(${matchedInitIds.join(',')})`);
+      }
+      // Add tag matches — each matching tag is checked via array-contains
+      // Sanitize tag values to prevent PostgREST filter injection from DB content
+      for (const t of matchedTags) {
+        const safeTag = t.replace(/[(),\\{}]/g, '');
+        if (safeTag) orParts.push(`tags.cs.{${safeTag}}`);
       }
 
       query = query.or(orParts.join(','));
@@ -262,6 +283,103 @@ export async function GET(request: NextRequest) {
     query = query.not('expires_at', 'is', null)
       .gte('expires_at', new Date().toISOString())
       .lte('expires_at', in30Days.toISOString());
+  }
+
+  // Advanced search — multi-condition with AND/OR operators
+  const advancedParam = searchParams.get('advanced');
+  if (advancedParam) {
+    try {
+      const conditions: { field: string; value: string; operator: string }[] = JSON.parse(advancedParam);
+      const validConditions = conditions.filter(c => c.value && c.value.trim());
+
+      if (validConditions.length > 0) {
+        // Group conditions into OR-separated blocks of AND-connected conditions
+        // First condition always starts a new group; subsequent conditions with OR start a new group
+        const groups: typeof validConditions[] = [];
+        let currentGroup: typeof validConditions = [];
+        for (const cond of validConditions) {
+          if (cond.operator === 'OR' && currentGroup.length > 0) {
+            groups.push(currentGroup);
+            currentGroup = [cond];
+          } else {
+            currentGroup.push(cond);
+          }
+        }
+        if (currentGroup.length > 0) groups.push(currentGroup);
+
+        // For each group, find matching asset IDs (AND within group)
+        const groupIdSets: Set<string>[] = [];
+        for (const group of groups) {
+          let groupIds: Set<string> | null = null;
+
+          for (const cond of group) {
+            const sanitized = cond.value.replace(/[(),\\]/g, '').trim().slice(0, 200);
+            if (!sanitized) continue;
+
+            let condQuery = supabase.from('assets').select('id').eq('is_archived', false);
+            switch (cond.field) {
+              case 'search':
+                condQuery = condQuery.or(
+                  `original_filename.ilike.%${sanitized}%,notes.ilike.%${sanitized}%,stored_filename.ilike.%${sanitized}%,text_content.ilike.%${sanitized}%,external_url.ilike.%${sanitized}%`
+                );
+                break;
+              case 'tag':
+                condQuery = condQuery.contains('tags', [sanitized]);
+                break;
+              case 'slug':
+                condQuery = condQuery.eq('slug_id', sanitized);
+                break;
+              case 'campaign':
+                condQuery = condQuery.eq('initiative_id', sanitized);
+                break;
+              case 'file_type':
+                condQuery = condQuery.eq('file_type', sanitized);
+                break;
+              case 'platform':
+                condQuery = condQuery.overlaps('platforms', [sanitized]);
+                break;
+              case 'domain_context':
+                condQuery = condQuery.eq('domain_context', sanitized);
+                break;
+              case 'asset_type':
+                condQuery = condQuery.eq('asset_type', sanitized);
+                break;
+              default:
+                continue;
+            }
+
+            // Note: limit caps advanced search matching to 5000 assets per condition
+            const { data: matchData } = await condQuery.limit(5000);
+            const matchIds = new Set((matchData || []).map(r => r.id));
+
+            // AND — intersect with current group results
+            if (groupIds === null) {
+              groupIds = matchIds;
+            } else {
+              groupIds = new Set(Array.from(groupIds).filter(id => matchIds.has(id)));
+            }
+          }
+
+          if (groupIds) groupIdSets.push(groupIds);
+        }
+
+        // OR between groups — union all group results
+        if (groupIdSets.length > 0) {
+          const finalIds = new Set<string>();
+          for (const s of groupIdSets) {
+            Array.from(s).forEach(id => finalIds.add(id));
+          }
+          if (finalIds.size === 0) {
+            // No matches — return empty
+            return NextResponse.json({ assets: [], total: 0 });
+          }
+          const idArray = Array.from(finalIds);
+          query = query.in('id', idArray);
+        }
+      }
+    } catch {
+      // Invalid JSON — ignore advanced parameter
+    }
   }
 
   // Pagination

@@ -129,14 +129,53 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Text search (simplified — matches filename, notes, external_url)
+  // Text search (matches filename, notes, external_url, tags, slug names, initiative names)
   const search = searchParams.get('search');
   if (search) {
     const sanitized = search.replace(/[(),\\]/g, '').trim().slice(0, 200);
     if (sanitized) {
-      query = query.or(
-        `original_filename.ilike.%${sanitized}%,notes.ilike.%${sanitized}%,stored_filename.ilike.%${sanitized}%,external_url.ilike.%${sanitized}%`
-      );
+      // Find matching slugs, initiatives, and tags in parallel
+      const [slugMatch, initMatch, tagRows] = await Promise.all([
+        supabase.from('slugs').select('id').or(`display_name.ilike.%${sanitized}%,slug.ilike.%${sanitized}%`),
+        supabase.from('initiatives').select('id').or(`name.ilike.%${sanitized}%,short_code.ilike.%${sanitized}%`),
+        supabase.from('assets').select('tags').not('tags', 'is', null),
+      ]);
+
+      const matchedSlugIds = (slugMatch.data || []).map(s => s.id);
+      const matchedInitIds = (initMatch.data || []).map(i => i.id);
+
+      // Extract unique tags that match search term
+      const matchedTags: string[] = [];
+      const seen = new Set<string>();
+      for (const row of tagRows.data || []) {
+        if (Array.isArray(row.tags)) {
+          for (const t of row.tags) {
+            if (t && typeof t === 'string' && !seen.has(t) && t.toLowerCase().includes(sanitized.toLowerCase())) {
+              seen.add(t);
+              matchedTags.push(t);
+            }
+          }
+        }
+      }
+
+      const orParts = [
+        `original_filename.ilike.%${sanitized}%`,
+        `notes.ilike.%${sanitized}%`,
+        `stored_filename.ilike.%${sanitized}%`,
+        `text_content.ilike.%${sanitized}%`,
+        `external_url.ilike.%${sanitized}%`,
+      ];
+      if (matchedSlugIds.length > 0) {
+        orParts.push(`slug_id.in.(${matchedSlugIds.join(',')})`);
+      }
+      if (matchedInitIds.length > 0) {
+        orParts.push(`initiative_id.in.(${matchedInitIds.join(',')})`);
+      }
+      for (const t of matchedTags) {
+        const safeTag = t.replace(/[(),\\{}]/g, '');
+        if (safeTag) orParts.push(`tags.cs.{${safeTag}}`);
+      }
+      query = query.or(orParts.join(','));
     }
   }
 
@@ -156,6 +195,65 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ file_types: {}, platforms: {}, aspect_ratios: {}, domain_contexts: {}, asset_types: {}, slugs: {}, initiatives: {}, total: 0 });
     }
     query = query.in('id', favoriteIds);
+  }
+
+  // Advanced search — multi-condition with AND/OR operators
+  const advancedParam = searchParams.get('advanced');
+  if (advancedParam) {
+    try {
+      const conditions: { field: string; value: string; operator: string }[] = JSON.parse(advancedParam);
+      const validConditions = conditions.filter(c => c.value && c.value.trim());
+
+      if (validConditions.length > 0) {
+        const groups: typeof validConditions[] = [];
+        let currentGroup: typeof validConditions = [];
+        for (const cond of validConditions) {
+          if (cond.operator === 'OR' && currentGroup.length > 0) {
+            groups.push(currentGroup);
+            currentGroup = [cond];
+          } else {
+            currentGroup.push(cond);
+          }
+        }
+        if (currentGroup.length > 0) groups.push(currentGroup);
+
+        const groupIdSets: Set<string>[] = [];
+        for (const group of groups) {
+          let groupIds: Set<string> | null = null;
+          for (const cond of group) {
+            const sanitized = cond.value.replace(/[(),\\]/g, '').trim().slice(0, 200);
+            if (!sanitized) continue;
+            let condQuery = supabase.from('assets').select('id').eq('is_archived', false);
+            switch (cond.field) {
+              case 'search':
+                condQuery = condQuery.or(`original_filename.ilike.%${sanitized}%,notes.ilike.%${sanitized}%,stored_filename.ilike.%${sanitized}%,text_content.ilike.%${sanitized}%,external_url.ilike.%${sanitized}%`);
+                break;
+              case 'tag': condQuery = condQuery.contains('tags', [sanitized]); break;
+              case 'slug': condQuery = condQuery.eq('slug_id', sanitized); break;
+              case 'campaign': condQuery = condQuery.eq('initiative_id', sanitized); break;
+              case 'file_type': condQuery = condQuery.eq('file_type', sanitized); break;
+              case 'platform': condQuery = condQuery.overlaps('platforms', [sanitized]); break;
+              case 'domain_context': condQuery = condQuery.eq('domain_context', sanitized); break;
+              case 'asset_type': condQuery = condQuery.eq('asset_type', sanitized); break;
+              default: continue;
+            }
+            const { data: matchData } = await condQuery.limit(5000);
+            const matchIds = new Set((matchData || []).map(r => r.id));
+            if (groupIds === null) { groupIds = matchIds; } else { groupIds = new Set(Array.from(groupIds).filter(id => matchIds.has(id))); }
+          }
+          if (groupIds) groupIdSets.push(groupIds);
+        }
+
+        if (groupIdSets.length > 0) {
+          const finalIds = new Set<string>();
+          for (const s of groupIdSets) { Array.from(s).forEach(id => finalIds.add(id)); }
+          if (finalIds.size === 0) {
+            return NextResponse.json({ file_types: {}, platforms: {}, aspect_ratios: {}, domain_contexts: {}, asset_types: {}, slugs: {}, initiatives: {}, total: 0 });
+          }
+          query = query.in('id', Array.from(finalIds));
+        }
+      }
+    } catch { /* ignore invalid JSON */ }
   }
 
   const { data: assets, error } = await query;
