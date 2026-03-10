@@ -58,7 +58,7 @@ import type { Asset, Slug, Initiative, SavedSearch } from '@/lib/types';
 import { VersionChain } from '@/components/assets/version-chain';
 import { PlatformSuggestion } from '@/components/assets/platform-suggestion';
 import { SimilarAssets } from '@/components/assets/similar-assets';
-import { TreeView } from '@/components/assets/tree-view';
+import { FolderBrowser } from '@/components/assets/folder-browser';
 import { CommentThread } from '@/components/assets/comment-thread';
 import { useComments } from '@/lib/hooks/use-comments';
 import { FolderTree } from 'lucide-react';
@@ -882,7 +882,7 @@ export default function AssetLibraryPage() {
             </Button>
             <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''} title="תצוגת רשת"><Grid3X3 className="w-4 h-4" /></Button>
             <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''} title="תצוגת רשימה"><List className="w-4 h-4" /></Button>
-            <Button variant={viewMode === 'tree' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('tree')} className={viewMode === 'tree' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''} title="תצוגת עץ"><FolderTree className="w-4 h-4" /></Button>
+            <Button variant={viewMode === 'tree' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('tree')} className={viewMode === 'tree' ? 'bg-ono-green hover:bg-ono-green-dark text-white' : ''} title="תצוגת תיקיות"><FolderTree className="w-4 h-4" /></Button>
           </div>
         </div>
 
@@ -988,27 +988,34 @@ export default function AssetLibraryPage() {
           </div>
         )}
 
-        {/* Assets grid/list/tree */}
+        {/* Folder browser (Drive-like navigation) — shown above assets in tree mode */}
+        {viewMode === 'tree' && (
+          <FolderBrowser
+            slugs={slugs}
+            initiatives={initiatives}
+            filterCounts={filterCounts.slugs}
+            initiativeCounts={filterCounts.initiatives}
+            currentSlugId={filterSlugs.length === 1 ? filterSlugs[0] : null}
+            onNavigate={(slugId) => {
+              if (slugId) { setFilterSlugs([slugId]); } else { setFilterSlugs([]); }
+              setPage(1);
+            }}
+            onFilterByInitiative={(id) => { setFilterInitiatives([id]); setPage(1); }}
+          />
+        )}
+
+        {/* Assets grid/list */}
         {loading ? (
           <div className="text-center py-12 text-ono-gray">
             <div className="w-8 h-8 border-2 border-ono-green border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             טוען חומרים...
           </div>
-        ) : assets.length === 0 ? (
+        ) : assets.length === 0 && viewMode !== 'tree' ? (
           <div className="text-center py-12 text-ono-gray">
             <FolderOpen className="w-12 h-12 mx-auto mb-3 text-ono-gray/50" />
             <p>לא נמצאו חומרים התואמים את החיפוש</p>
           </div>
-        ) : viewMode === 'tree' ? (
-          <TreeView
-            slugs={slugs}
-            initiatives={initiatives}
-            assets={assets}
-            onFilterBySlug={(id) => { setFilterSlugs([id]); setPage(1); }}
-            onFilterByInitiative={(id) => { setFilterInitiatives([id]); setPage(1); }}
-            onSelectAsset={(asset) => setDetailAsset(asset)}
-          />
-        ) : viewMode === 'grid' ? (
+        ) : viewMode === 'grid' || (viewMode === 'tree' && assets.length > 0) ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {assets.map(asset => (
               <div key={asset.id} className={`group bg-white border rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden cursor-pointer transition-all hover:border-ono-green ${selectedAssets.has(asset.id) ? 'border-ono-green ring-2 ring-ono-green/20' : 'border-[#E8E8E8]'}`}>
@@ -1101,7 +1108,7 @@ export default function AssetLibraryPage() {
               </div>
             ))}
           </div>
-        ) : (
+        ) : viewMode === 'list' && assets.length > 0 ? (
           <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -1143,7 +1150,7 @@ export default function AssetLibraryPage() {
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
 
         {/* Pagination */}
         {total > 48 && (
