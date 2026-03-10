@@ -36,6 +36,7 @@ import { computeFileSizeLabel } from '@/lib/aspect-ratio';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { useGlobalToast } from '@/components/ui/global-toast';
 import { logClientError } from '@/lib/error-logger';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import type { Slug, Initiative } from '@/lib/types';
 
 interface FileEntry {
@@ -101,6 +102,16 @@ export default function UploadPage() {
   const [filePercent, setFilePercent] = useState<Record<number, number>>({}); // per-file 0-100
   const [uploadResults, setUploadResults] = useState<{ uploaded: number; errors: number } | null>(null);
 
+  // Quick slug creation
+  const [showSlugModal, setShowSlugModal] = useState(false);
+  const [newSlugName, setNewSlugName] = useState('');
+  const [newSlugCode, setNewSlugCode] = useState('');
+  const [newSlugCodeWarning, setNewSlugCodeWarning] = useState('');
+  const [newSlugParent, setNewSlugParent] = useState('');
+  const [savingSlug, setSavingSlug] = useState(false);
+  const [slugError, setSlugError] = useState('');
+  const [userCanManage, setUserCanManage] = useState(false);
+
   // Quick initiative creation
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
   const [newInitName, setNewInitName] = useState('');
@@ -133,6 +144,13 @@ export default function UploadPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Check user permissions for quick-create
+  useEffect(() => {
+    fetch('/api/users/me').then(r => r.ok ? r.json() : null).then(profile => {
+      if (profile?.permissions?.can_manage_campaigns) setUserCanManage(true);
+    }).catch(() => {});
+  }, []);
 
   const filteredInitiatives = initiatives.filter(
     (i) => !i.slug_id || i.slug_id === selectedSlug
@@ -440,6 +458,51 @@ export default function UploadPage() {
     setUploading(false);
   };
 
+  const handleCreateSlug = async () => {
+    if (!newSlugName || !newSlugCode || !selectedWorkspace) return;
+    setSavingSlug(true);
+    setSlugError('');
+
+    const finalSlug = newSlugParent ? `${newSlugParent}-${newSlugCode}` : newSlugCode;
+
+    try {
+      const res = await fetch('/api/slugs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: finalSlug,
+          display_name: newSlugName,
+          workspace_id: selectedWorkspace,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setSlugError(data.error || 'שגיאה ביצירת סלאג');
+        setSavingSlug(false);
+        return;
+      }
+
+      const created = await res.json();
+      // Refresh slugs and auto-select
+      const slRes = await fetch('/api/slugs');
+      const allSl = await slRes.json();
+      setSlugs(allSl);
+      setSelectedSlug(created.id);
+
+      // Reset and close
+      setNewSlugName('');
+      setNewSlugCode('');
+      setNewSlugCodeWarning('');
+      setNewSlugParent('');
+      setShowSlugModal(false);
+      showSuccess('הסלאג נוצר בהצלחה');
+    } catch {
+      setSlugError('שגיאה ביצירת סלאג');
+    }
+    setSavingSlug(false);
+  };
+
   const togglePlatform = (platform: string) => {
     setSelectedPlatforms(prev =>
       prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]
@@ -492,6 +555,7 @@ export default function UploadPage() {
       setNewInitStartDate('');
       setNewInitEndDate('');
       setShowInitiativeModal(false);
+      showSuccess('הקמפיין נוצר בהצלחה');
     } catch {
       setInitError('שגיאה ביצירת מהלך');
     }
@@ -662,25 +726,53 @@ export default function UploadPage() {
 
             <div>
               <Label className="flex items-center gap-1">סלאג * <InfoTooltip text="הסלאג מייצג את התחום או המחלקה שאליה שייך החומר, למשל: mba, law, cs. חובה לבחור סלאג." /></Label>
-              <select value={selectedSlug} onChange={e => { setSelectedSlug(e.target.value); setSelectedInitiative(''); }} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
-                <option value="">בחר סלאג...</option>
-                {slugs.filter(s => !s.is_archived).map(s => (
-                  <option key={s.id} value={s.id}>{s.slug.includes('-') ? '  \u2190 ' : ''}{s.display_name} ({s.slug})</option>
-                ))}
-              </select>
+              <div className="flex gap-1.5 mt-1">
+                <SearchableSelect
+                  className="flex-1"
+                  options={slugs.filter(s => !s.is_archived).map(s => ({
+                    value: s.id,
+                    label: s.display_name,
+                    sublabel: s.slug,
+                    indent: s.slug.includes('-'),
+                  }))}
+                  value={selectedSlug}
+                  onChange={v => { setSelectedSlug(v); setSelectedInitiative(''); }}
+                  placeholder="חיפוש סלאג..."
+                  emptyOptionLabel="בחר סלאג..."
+                  emptyLabel="לא נמצאו סלאגים"
+                />
+                {userCanManage && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
+                    onClick={() => { setShowSlugModal(true); setSlugError(''); }}
+                    title="צור סלאג חדש"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div>
               <Label className="flex items-center gap-1">קמפיין (אופציונלי) <InfoTooltip text="שייכו את החומר לקמפיין ספציפי. ניתן גם ליצור קמפיין חדש ישירות מכאן." /></Label>
               <div className="flex gap-1.5 mt-1">
-                <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} className="flex-1 border border-[#E8E8E8] rounded-md p-2 text-sm">
-                  <option value="">ללא קמפיין</option>
-                  {filteredInitiatives.map(i => (
-                    <option key={i.id} value={i.id}>
-                      {i.name} ({i.short_code}) {!i.slug_id ? '\uD83C\uDF10' : ''}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  className="flex-1"
+                  options={filteredInitiatives.map(i => ({
+                    value: i.id,
+                    label: `${i.name} (${i.short_code})`,
+                    sublabel: !i.slug_id ? '🌐' : undefined,
+                  }))}
+                  value={selectedInitiative}
+                  onChange={v => setSelectedInitiative(v)}
+                  placeholder="חיפוש קמפיין..."
+                  allowEmpty
+                  emptyOptionLabel="ללא קמפיין"
+                  emptyLabel="לא נמצאו קמפיינים"
+                />
                 <Button
                   type="button"
                   variant="outline"
@@ -927,22 +1019,52 @@ export default function UploadPage() {
 
             <div>
               <Label className="flex items-center gap-1">סלאג * <InfoTooltip text="הסלאג מייצג את התחום שאליו שייך הקישור." /></Label>
-              <select value={selectedSlug} onChange={e => { setSelectedSlug(e.target.value); setSelectedInitiative(''); }} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
-                <option value="">בחר סלאג...</option>
-                {slugs.filter(s => !s.is_archived).map(s => (
-                  <option key={s.id} value={s.id}>{s.display_name} ({s.slug})</option>
-                ))}
-              </select>
+              <div className="flex gap-1.5 mt-1">
+                <SearchableSelect
+                  className="flex-1"
+                  options={slugs.filter(s => !s.is_archived).map(s => ({
+                    value: s.id,
+                    label: s.display_name,
+                    sublabel: s.slug,
+                    indent: s.slug.includes('-'),
+                  }))}
+                  value={selectedSlug}
+                  onChange={v => { setSelectedSlug(v); setSelectedInitiative(''); }}
+                  placeholder="חיפוש סלאג..."
+                  emptyOptionLabel="בחר סלאג..."
+                  emptyLabel="לא נמצאו סלאגים"
+                />
+                {userCanManage && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
+                    onClick={() => { setShowSlugModal(true); setSlugError(''); }}
+                    title="צור סלאג חדש"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div>
               <Label>קמפיין (אופציונלי)</Label>
-              <select value={selectedInitiative} onChange={e => setSelectedInitiative(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
-                <option value="">ללא קמפיין</option>
-                {filteredInitiatives.map(i => (
-                  <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>
-                ))}
-              </select>
+              <SearchableSelect
+                className="mt-1"
+                options={filteredInitiatives.map(i => ({
+                  value: i.id,
+                  label: `${i.name} (${i.short_code})`,
+                  sublabel: !i.slug_id ? '🌐' : undefined,
+                }))}
+                value={selectedInitiative}
+                onChange={v => setSelectedInitiative(v)}
+                placeholder="חיפוש קמפיין..."
+                allowEmpty
+                emptyOptionLabel="ללא קמפיין"
+                emptyLabel="לא נמצאו קמפיינים"
+              />
             </div>
 
             <div>
@@ -1099,6 +1221,75 @@ export default function UploadPage() {
               className="bg-ono-green hover:bg-ono-green-dark text-white"
             >
               {savingInitiative ? 'יוצר...' : 'צור קמפיין'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Slug Creation Modal */}
+      <Dialog open={showSlugModal} onOpenChange={setShowSlugModal}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-ono-green" />
+              יצירת סלאג מהיר
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="flex items-center gap-1">שם תצוגה * <InfoTooltip text="שם בעברית שיוצג בממשק, למשל: בינלאומי - ריפוי בעיסוק." /></Label>
+              <Input className="mt-1" placeholder="בינלאומי - ריפוי בעיסוק" value={newSlugName} onChange={e => setNewSlugName(e.target.value)} />
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-1">תיקיית-אב (אופציונלי) <InfoTooltip text="בחרו סלאג קיים כהורה ליצירת היררכיה. למשל: בחירת 'international' תיצור תת-סלאג." /></Label>
+              <select value={newSlugParent} onChange={e => setNewSlugParent(e.target.value)} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
+                <option value="">ללא (סלאג ראשי)</option>
+                {slugs.filter(s => !s.is_archived).map(s => (
+                  <option key={s.slug} value={s.slug}>{s.display_name} ({s.slug})</option>
+                ))}
+              </select>
+              {newSlugParent && newSlugCode && (
+                <p className="text-xs text-ono-gray mt-1 font-mono" dir="ltr">
+                  {newSlugParent}-{newSlugCode}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label className="flex items-center gap-1">קוד סלאג (באנגלית) * <InfoTooltip text="קוד באנגלית קטנה ומספרים בלבד. ישמש בניווט ובשמות קבצים." /></Label>
+              <Input
+                dir="ltr"
+                className={`text-left font-mono mt-1 ${newSlugCodeWarning ? 'border-ono-orange' : ''}`}
+                placeholder="ot"
+                value={newSlugCode}
+                onChange={e => {
+                  const raw = e.target.value;
+                  if (containsHebrew(raw)) {
+                    setNewSlugCodeWarning('שדה זה מקבל אותיות באנגלית בלבד.');
+                    return;
+                  }
+                  setNewSlugCodeWarning('');
+                  setNewSlugCode(raw.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                }}
+              />
+              {newSlugCodeWarning && (
+                <p className="text-xs text-ono-orange mt-1">{newSlugCodeWarning}</p>
+              )}
+            </div>
+
+            {slugError && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{slugError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSlugModal(false)}>ביטול</Button>
+            <Button
+              onClick={handleCreateSlug}
+              disabled={savingSlug || !newSlugName || !newSlugCode}
+              className="bg-ono-green hover:bg-ono-green-dark text-white"
+            >
+              {savingSlug ? 'יוצר...' : 'צור סלאג'}
             </Button>
           </DialogFooter>
         </DialogContent>

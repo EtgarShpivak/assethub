@@ -35,6 +35,7 @@ import {
   Upload as UploadIcon,
   ScrollText,
   ExternalLink,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -176,6 +177,8 @@ export default function AssetLibraryPage() {
   const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('date_from') || '');
   const [filterDateTo, setFilterDateTo] = useState(searchParams.get('date_to') || '');
   const [filterTag, setFilterTag] = useState('');
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [filterExpiry, setFilterExpiry] = useState(searchParams.get('expiry') || '');
   const [filterUploadedBy, setFilterUploadedBy] = useState(searchParams.get('uploaded_by') || '');
   const [uploaders, setUploaders] = useState<{ id: string; name: string }[]>([]);
@@ -215,6 +218,22 @@ export default function AssetLibraryPage() {
   const [editData, setEditData] = useState<Partial<Asset>>({});
   const [editSaving, setEditSaving] = useState(false);
 
+  // Quick-create in edit mode
+  const [userCanManage, setUserCanManage] = useState(false);
+  const [showQuickSlug, setShowQuickSlug] = useState(false);
+  const [quickSlugName, setQuickSlugName] = useState('');
+  const [quickSlugCode, setQuickSlugCode] = useState('');
+  const [quickSlugParent, setQuickSlugParent] = useState('');
+  const [quickSlugSaving, setQuickSlugSaving] = useState(false);
+  const [quickSlugError, setQuickSlugError] = useState('');
+  const [showQuickInit, setShowQuickInit] = useState(false);
+  const [quickInitName, setQuickInitName] = useState('');
+  const [quickInitCode, setQuickInitCode] = useState('');
+  const [quickInitSaving, setQuickInitSaving] = useState(false);
+  const [quickInitError, setQuickInitError] = useState('');
+  const [editTagInput, setEditTagInput] = useState('');
+  const [showEditTagSuggestions, setShowEditTagSuggestions] = useState(false);
+
   // Bulk edit
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<{
@@ -244,6 +263,13 @@ export default function AssetLibraryPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setUserId(data.user.id);
     });
+  }, []);
+
+  // Check permissions for quick-create actions
+  useEffect(() => {
+    fetch('/api/users/me').then(r => r.ok ? r.json() : null).then(profile => {
+      if (profile?.permissions?.can_manage_campaigns) setUserCanManage(true);
+    }).catch(() => {});
   }, []);
 
   // Load saved searches
@@ -825,6 +851,61 @@ export default function AssetLibraryPage() {
     else { setSortBy(field); setSortDir('desc'); }
   };
 
+  // Quick slug creation from edit mode
+  const handleQuickCreateSlug = async () => {
+    if (!quickSlugName || !quickSlugCode) return;
+    setQuickSlugSaving(true);
+    setQuickSlugError('');
+    const finalSlug = quickSlugParent ? `${quickSlugParent}-${quickSlugCode}` : quickSlugCode;
+    try {
+      const wsRes = await fetch('/api/workspaces');
+      if (!wsRes.ok) { setQuickSlugError('שגיאה בטעינת סביבת עבודה'); setQuickSlugSaving(false); return; }
+      const ws = await wsRes.json();
+      if (!ws[0]?.id) { setQuickSlugError('לא נמצאה סביבת עבודה'); setQuickSlugSaving(false); return; }
+      const res = await fetch('/api/slugs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: finalSlug, display_name: quickSlugName, workspace_id: ws[0].id }),
+      });
+      if (!res.ok) { const d = await res.json(); setQuickSlugError(d.error || 'שגיאה'); setQuickSlugSaving(false); return; }
+      const created = await res.json();
+      const allSl = await fetch('/api/slugs').then(r => r.json());
+      setSlugs(allSl);
+      setEditData(prev => ({ ...prev, slug_id: created.id }));
+      setShowQuickSlug(false);
+      setQuickSlugName(''); setQuickSlugCode(''); setQuickSlugParent('');
+      _showSuccess('הסלאג נוצר בהצלחה');
+    } catch { setQuickSlugError('שגיאה ביצירת סלאג'); }
+    setQuickSlugSaving(false);
+  };
+
+  // Quick initiative creation from edit mode
+  const handleQuickCreateInit = async () => {
+    if (!quickInitName || !quickInitCode) return;
+    setQuickInitSaving(true);
+    setQuickInitError('');
+    try {
+      const wsRes = await fetch('/api/workspaces');
+      if (!wsRes.ok) { setQuickInitError('שגיאה בטעינת סביבת עבודה'); setQuickInitSaving(false); return; }
+      const ws = await wsRes.json();
+      if (!ws[0]?.id) { setQuickInitError('לא נמצאה סביבת עבודה'); setQuickInitSaving(false); return; }
+      const res = await fetch('/api/initiatives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: quickInitName, short_code: quickInitCode, slug_id: editData.slug_id || null, workspace_id: ws[0].id }),
+      });
+      if (!res.ok) { const d = await res.json(); setQuickInitError(d.error || 'שגיאה'); setQuickInitSaving(false); return; }
+      const created = await res.json();
+      const allIni = await fetch('/api/initiatives').then(r => r.json());
+      setInitiatives(allIni);
+      setEditData(prev => ({ ...prev, initiative_id: created.id }));
+      setShowQuickInit(false);
+      setQuickInitName(''); setQuickInitCode('');
+      _showSuccess('הקמפיין נוצר בהצלחה');
+    } catch { setQuickInitError('שגיאה ביצירת קמפיין'); }
+    setQuickInitSaving(false);
+  };
+
   const slugOptions = slugs.filter(s => !s.is_archived).map(s => ({
     value: s.id, label: `${s.slug.includes('-') ? '  ' : ''}${s.display_name}`,
   }));
@@ -915,20 +996,44 @@ export default function AssetLibraryPage() {
               <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>
             ))}
           </select>
-          {/* Tag quick filter */}
-          <div className="relative min-w-[140px]">
+          {/* Tag quick filter — searchable */}
+          <div className="relative min-w-[160px]">
             <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
-            <select
-              value={filterTag}
-              onChange={(e) => setFilterTag(e.target.value)}
-              className="w-full border border-[#E8E8E8] rounded-md p-2 pr-10 text-sm h-10 appearance-none"
-            >
-              <option value="">כל התגיות</option>
-              <option value="__no_tags__">ללא תגיות</option>
-              {availableTags.map(t => (
-                <option key={t.name} value={t.name}>{t.name} ({t.count})</option>
-              ))}
-            </select>
+            {filterTag ? (
+              <div className="flex items-center border border-ono-green/50 bg-ono-green-light/30 rounded-md h-10 px-2 pr-10 text-sm gap-1">
+                <span className="truncate text-ono-gray-dark">{filterTag === '__no_tags__' ? 'ללא תגיות' : filterTag}</span>
+                <button className="shrink-0 mr-auto hover:text-red-500 transition-colors" onClick={() => { setFilterTag(''); setTagSearchQuery(''); }}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Input
+                className="pr-10 h-10"
+                placeholder="חיפוש תגית..."
+                value={tagSearchQuery}
+                onChange={e => { setTagSearchQuery(e.target.value); setShowTagDropdown(true); }}
+                onFocus={() => setShowTagDropdown(true)}
+                onBlur={() => setTimeout(() => setShowTagDropdown(false), 200)}
+              />
+            )}
+            {showTagDropdown && !filterTag && (
+              <div className="absolute z-20 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-48 overflow-auto">
+                <button type="button" className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-gray-light transition-colors text-ono-gray" onMouseDown={e => { e.preventDefault(); setFilterTag('__no_tags__'); setTagSearchQuery(''); setShowTagDropdown(false); setPage(1); }}>
+                  ללא תגיות
+                </button>
+                {availableTags
+                  .filter(t => !tagSearchQuery || t.name.includes(tagSearchQuery))
+                  .map(t => (
+                    <button key={t.name} type="button" className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors flex items-center justify-between" onMouseDown={e => { e.preventDefault(); setFilterTag(t.name); setTagSearchQuery(''); setShowTagDropdown(false); setPage(1); }}>
+                      <span>{t.name}</span>
+                      <span className="text-[10px] text-ono-gray">({t.count})</span>
+                    </button>
+                  ))}
+                {tagSearchQuery && !availableTags.some(t => t.name.includes(tagSearchQuery)) && (
+                  <p className="px-3 py-2 text-xs text-ono-gray">לא נמצאו תגיות</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1315,16 +1420,61 @@ export default function AssetLibraryPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label className="text-xs">סלאג</Label>
-                        <select value={editData.slug_id || ''} onChange={e => setEditData({ ...editData, slug_id: e.target.value })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
-                          {slugs.filter(s => !s.is_archived).map(s => <option key={s.id} value={s.id}>{s.display_name}</option>)}
-                        </select>
+                        <div className="flex gap-1 mt-1">
+                          <select value={editData.slug_id || ''} onChange={e => setEditData({ ...editData, slug_id: e.target.value })} className="flex-1 border border-[#E8E8E8] rounded-md p-2 text-sm">
+                            {slugs.filter(s => !s.is_archived).map(s => <option key={s.id} value={s.id}>{s.display_name}</option>)}
+                          </select>
+                          {userCanManage && (
+                            <Button type="button" variant="outline" size="sm" className="shrink-0 h-[34px] w-[34px] p-0 border-ono-green text-ono-green hover:bg-ono-green-light" onClick={() => { setShowQuickSlug(true); setQuickSlugError(''); }} title="צור סלאג חדש">
+                              <Plus className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                        {/* Inline slug creation */}
+                        {showQuickSlug && (
+                          <div className="mt-2 p-2.5 bg-white border border-ono-green/30 rounded-md space-y-2">
+                            <Input className="text-xs h-8" placeholder="שם תצוגה (עברית)" value={quickSlugName} onChange={e => setQuickSlugName(e.target.value)} />
+                            <div className="flex gap-1">
+                              <select value={quickSlugParent} onChange={e => setQuickSlugParent(e.target.value)} className="flex-1 border border-[#E8E8E8] rounded-md p-1 text-xs">
+                                <option value="">ללא הורה</option>
+                                {slugs.filter(s => !s.is_archived).map(s => <option key={s.slug} value={s.slug}>{s.display_name}</option>)}
+                              </select>
+                              <Input dir="ltr" className="flex-1 text-left font-mono text-xs h-8" placeholder="קוד (en)" value={quickSlugCode} onChange={e => setQuickSlugCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))} />
+                            </div>
+                            {quickSlugParent && quickSlugCode && <p className="text-[10px] text-ono-gray font-mono" dir="ltr">{quickSlugParent}-{quickSlugCode}</p>}
+                            {quickSlugError && <p className="text-[10px] text-red-600">{quickSlugError}</p>}
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-7 text-xs bg-ono-green hover:bg-ono-green-dark text-white" onClick={handleQuickCreateSlug} disabled={quickSlugSaving || !quickSlugName || !quickSlugCode}>{quickSlugSaving ? '...' : 'צור'}</Button>
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowQuickSlug(false)}>ביטול</Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs">קמפיין</Label>
-                        <select value={editData.initiative_id || ''} onChange={e => setEditData({ ...editData, initiative_id: e.target.value || undefined })} className="w-full border border-[#E8E8E8] rounded-md p-2 text-sm mt-1">
-                          <option value="">ללא קמפיין</option>
-                          {initiatives.map(i => <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>)}
-                        </select>
+                        <div className="flex gap-1 mt-1">
+                          <select value={editData.initiative_id || ''} onChange={e => setEditData({ ...editData, initiative_id: e.target.value || undefined })} className="flex-1 border border-[#E8E8E8] rounded-md p-2 text-sm">
+                            <option value="">ללא קמפיין</option>
+                            {initiatives.map(i => <option key={i.id} value={i.id}>{i.name} ({i.short_code})</option>)}
+                          </select>
+                          {userCanManage && (
+                            <Button type="button" variant="outline" size="sm" className="shrink-0 h-[34px] w-[34px] p-0 border-ono-green text-ono-green hover:bg-ono-green-light" onClick={() => { setShowQuickInit(true); setQuickInitError(''); }} title="צור קמפיין חדש">
+                              <Plus className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                        {/* Inline initiative creation */}
+                        {showQuickInit && (
+                          <div className="mt-2 p-2.5 bg-white border border-ono-green/30 rounded-md space-y-2">
+                            <Input className="text-xs h-8" placeholder="שם קמפיין (עברית)" value={quickInitName} onChange={e => setQuickInitName(e.target.value)} />
+                            <Input dir="ltr" className="text-left font-mono text-xs h-8" placeholder="קוד קצר (en)" value={quickInitCode} onChange={e => setQuickInitCode(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))} />
+                            {quickInitError && <p className="text-[10px] text-red-600">{quickInitError}</p>}
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-7 text-xs bg-ono-green hover:bg-ono-green-dark text-white" onClick={handleQuickCreateInit} disabled={quickInitSaving || !quickInitName || !quickInitCode}>{quickInitSaving ? '...' : 'צור'}</Button>
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowQuickInit(false)}>ביטול</Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs">סוג תוכן</Label>
@@ -1341,8 +1491,66 @@ export default function AssetLibraryPage() {
                       </div>
                     </div>
                     <div>
-                      <Label className="text-xs">תגיות (מופרדות בפסיק)</Label>
-                      <Input className="mt-1 text-sm" value={Array.isArray(editData.tags) ? editData.tags.join(', ') : ''} onChange={e => setEditData({ ...editData, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })} placeholder="תגית1, תגית2, ..." />
+                      <Label className="text-xs">תגיות</Label>
+                      {/* Tag chips */}
+                      {Array.isArray(editData.tags) && editData.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1 mb-1.5">
+                          {editData.tags.map(tag => (
+                            <Badge key={tag} className="bg-ono-green-light text-ono-green-dark border border-ono-green/30 text-[10px] cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-colors" onClick={() => setEditData({ ...editData, tags: editData.tags!.filter(t => t !== tag) })}>
+                              {tag} <X className="w-2.5 h-2.5 mr-0.5" />
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {/* Tag search input with autocomplete */}
+                      <div className="relative">
+                        <Input
+                          className="mt-1 text-sm"
+                          placeholder="הקלידו לחיפוש או הוספת תגית..."
+                          value={editTagInput}
+                          onChange={e => { setEditTagInput(e.target.value); setShowEditTagSuggestions(true); }}
+                          onFocus={() => setShowEditTagSuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowEditTagSuggestions(false), 200)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && editTagInput.trim()) {
+                              e.preventDefault();
+                              const newTag = editTagInput.trim();
+                              const current = Array.isArray(editData.tags) ? editData.tags : [];
+                              if (!current.includes(newTag)) setEditData({ ...editData, tags: [...current, newTag] });
+                              setEditTagInput('');
+                              setShowEditTagSuggestions(false);
+                            }
+                          }}
+                        />
+                        {showEditTagSuggestions && (editTagInput || availableTags.length > 0) && (
+                          <div className="absolute z-30 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-32 overflow-auto">
+                            {availableTags
+                              .filter(t => {
+                                const current = Array.isArray(editData.tags) ? editData.tags : [];
+                                return !current.includes(t.name) && (!editTagInput || t.name.includes(editTagInput));
+                              })
+                              .slice(0, 8)
+                              .map(tag => (
+                                <button key={tag.name} type="button" className="w-full text-right px-3 py-1 text-xs hover:bg-ono-green-light/50 transition-colors" onMouseDown={e => {
+                                  e.preventDefault();
+                                  const current = Array.isArray(editData.tags) ? editData.tags : [];
+                                  setEditData({ ...editData, tags: [...current, tag.name] });
+                                  setEditTagInput('');
+                                  setShowEditTagSuggestions(false);
+                                }}>{tag.name} <span className="text-ono-gray">({tag.count})</span></button>
+                              ))}
+                            {editTagInput.trim() && !availableTags.some(t => t.name === editTagInput.trim()) && (
+                              <button type="button" className="w-full text-right px-3 py-1 text-xs text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors border-t border-[#E8E8E8]" onMouseDown={e => {
+                                e.preventDefault();
+                                const current = Array.isArray(editData.tags) ? editData.tags : [];
+                                setEditData({ ...editData, tags: [...current, editTagInput.trim()] });
+                                setEditTagInput('');
+                                setShowEditTagSuggestions(false);
+                              }}>+ צור תגית &quot;{editTagInput.trim()}&quot;</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <Label className="text-xs">פלטפורמות</Label>
