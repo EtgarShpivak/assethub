@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Upload as UploadIcon,
   X,
@@ -84,7 +84,8 @@ export default function UploadPage() {
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
-  const tagInputRef = useRef<HTMLInputElement>(null);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
   const [assetType, setAssetType] = useState('production');
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
   const [noExpiry, setNoExpiry] = useState(true);
@@ -837,14 +838,11 @@ export default function UploadPage() {
                 ))}
               </div>
             )}
-            {/* Tag input with + button and suggestions */}
+            {/* Tag searchable select + add button */}
             <div className="flex gap-1.5 mt-1">
               <div className="relative flex-1">
-                <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
                 <Input
-                  ref={tagInputRef}
-                  className="pr-10"
-                  placeholder="הקלידו לחיפוש או הוספת תגית חדשה..."
+                  placeholder="חיפוש תגית..."
                   value={tagInput}
                   onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
                   onFocus={() => setShowTagSuggestions(true)}
@@ -861,25 +859,8 @@ export default function UploadPage() {
                     }
                   }}
                 />
-                {showTagSuggestions && (tagInput || availableTags.length > 0) && (
+                {showTagSuggestions && availableTags.filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput))).length > 0 && (
                   <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-48 overflow-auto">
-                    {/* Create new tag option — always visible at top when typing */}
-                    {tagInput.trim() && !selectedTags.includes(tagInput.trim()) && (
-                      <button
-                        type="button"
-                        className="w-full text-right px-3 py-2 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors flex items-center gap-1.5 border-b border-[#E8E8E8]"
-                        onMouseDown={e => {
-                          e.preventDefault();
-                          setSelectedTags(prev => [...prev, tagInput.trim()]);
-                          setTagInput('');
-                          setShowTagSuggestions(false);
-                        }}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        {availableTags.some(t => t.name === tagInput.trim()) ? `הוסף "${tagInput.trim()}"` : `צור תגית חדשה "${tagInput.trim()}"`}
-                      </button>
-                    )}
-                    {/* Existing tag suggestions */}
                     {availableTags
                       .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
                       .slice(0, 10)
@@ -899,9 +880,6 @@ export default function UploadPage() {
                           <span className="text-[10px] text-ono-gray">({tag.count})</span>
                         </button>
                       ))}
-                    {!tagInput && availableTags.filter(t => !selectedTags.includes(t.name)).length === 0 && (
-                      <p className="px-3 py-2 text-xs text-ono-gray">אין תגיות עדיין. הקלידו להוספת תגית חדשה.</p>
-                    )}
                   </div>
                 )}
               </div>
@@ -910,15 +888,8 @@ export default function UploadPage() {
                 variant="outline"
                 size="sm"
                 className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
-                onClick={() => {
-                  if (tagInput.trim() && !selectedTags.includes(tagInput.trim())) {
-                    setSelectedTags(prev => [...prev, tagInput.trim()]);
-                    setTagInput('');
-                  }
-                  tagInputRef.current?.focus();
-                  setShowTagSuggestions(true);
-                }}
-                title="הוסף תגית חדשה"
+                onClick={() => { setShowTagModal(true); setNewTagName(''); }}
+                title="צור תגית חדשה"
               >
                 <Plus className="w-4 h-4" />
               </Button>
@@ -1104,10 +1075,8 @@ export default function UploadPage() {
             )}
             <div className="flex gap-1.5 mt-1">
               <div className="relative flex-1">
-                <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
                 <Input
-                  className="pr-10"
-                  placeholder="הקלידו לחיפוש או הוספת תגית חדשה..."
+                  placeholder="חיפוש תגית..."
                   value={tagInput}
                   onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
                   onFocus={() => setShowTagSuggestions(true)}
@@ -1122,14 +1091,8 @@ export default function UploadPage() {
                     }
                   }}
                 />
-                {showTagSuggestions && (tagInput || availableTags.length > 0) && (
+                {showTagSuggestions && availableTags.filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput))).length > 0 && (
                   <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-48 overflow-auto">
-                    {tagInput.trim() && !selectedTags.includes(tagInput.trim()) && (
-                      <button type="button" className="w-full text-right px-3 py-2 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors flex items-center gap-1.5 border-b border-[#E8E8E8]" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tagInput.trim()]); setTagInput(''); setShowTagSuggestions(false); }}>
-                        <Plus className="w-3.5 h-3.5" />
-                        {availableTags.some(t => t.name === tagInput.trim()) ? `הוסף "${tagInput.trim()}"` : `צור תגית חדשה "${tagInput.trim()}"`}
-                      </button>
-                    )}
                     {availableTags
                       .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
                       .slice(0, 10)
@@ -1139,9 +1102,6 @@ export default function UploadPage() {
                           <span className="text-[10px] text-ono-gray">({tag.count})</span>
                         </button>
                       ))}
-                    {!tagInput && availableTags.filter(t => !selectedTags.includes(t.name)).length === 0 && (
-                      <p className="px-3 py-2 text-xs text-ono-gray">אין תגיות עדיין. הקלידו להוספת תגית חדשה.</p>
-                    )}
                   </div>
                 )}
               </div>
@@ -1150,15 +1110,8 @@ export default function UploadPage() {
                 variant="outline"
                 size="sm"
                 className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
-                onClick={() => {
-                  if (tagInput.trim() && !selectedTags.includes(tagInput.trim())) {
-                    setSelectedTags(prev => [...prev, tagInput.trim()]);
-                    setTagInput('');
-                  }
-                  tagInputRef.current?.focus();
-                  setShowTagSuggestions(true);
-                }}
-                title="הוסף תגית חדשה"
+                onClick={() => { setShowTagModal(true); setNewTagName(''); }}
+                title="צור תגית חדשה"
               >
                 <Plus className="w-4 h-4" />
               </Button>
@@ -1332,6 +1285,64 @@ export default function UploadPage() {
               className="bg-ono-green hover:bg-ono-green-dark text-white"
             >
               {savingSlug ? 'יוצר...' : 'צור סלאג'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Tag Creation Modal */}
+      <Dialog open={showTagModal} onOpenChange={setShowTagModal}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="w-5 h-5 text-ono-green" />
+              הוספת תגית חדשה
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>שם התגית *</Label>
+              <Input
+                className="mt-1"
+                placeholder="למשל: קמפיין קיץ 2026"
+                value={newTagName}
+                onChange={e => setNewTagName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newTagName.trim()) {
+                    e.preventDefault();
+                    if (!selectedTags.includes(newTagName.trim())) {
+                      setSelectedTags(prev => [...prev, newTagName.trim()]);
+                    }
+                    setNewTagName('');
+                    setShowTagModal(false);
+                  }
+                }}
+                autoFocus
+              />
+              {newTagName.trim() && availableTags.some(t => t.name === newTagName.trim()) && (
+                <p className="text-xs text-ono-orange mt-1">תגית זו כבר קיימת במערכת — תתווסף לחומר.</p>
+              )}
+              {newTagName.trim() && selectedTags.includes(newTagName.trim()) && (
+                <p className="text-xs text-red-500 mt-1">תגית זו כבר נבחרה.</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTagModal(false)}>ביטול</Button>
+            <Button
+              onClick={() => {
+                if (newTagName.trim() && !selectedTags.includes(newTagName.trim())) {
+                  setSelectedTags(prev => [...prev, newTagName.trim()]);
+                }
+                setNewTagName('');
+                setShowTagModal(false);
+              }}
+              disabled={!newTagName.trim() || selectedTags.includes(newTagName.trim())}
+              className="bg-ono-green hover:bg-ono-green-dark text-white"
+            >
+              הוסף תגית
             </Button>
           </DialogFooter>
         </DialogContent>
