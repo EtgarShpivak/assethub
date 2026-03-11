@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Upload as UploadIcon,
   X,
@@ -18,6 +18,7 @@ import {
   ScrollText,
   ExternalLink,
   Link as LinkIcon,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +84,7 @@ export default function UploadPage() {
   const [availableTags, setAvailableTags] = useState<{ name: string; count: number }[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const [assetType, setAssetType] = useState('production');
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
   const [noExpiry, setNoExpiry] = useState(true);
@@ -825,7 +827,7 @@ export default function UploadPage() {
 
           <div>
             <Label className="flex items-center gap-1">תגיות <InfoTooltip text="בחרו תגיות קיימות או הוסיפו חדשות. תגיות עוזרות לחיפוש מהיר של חומרים." /></Label>
-            {/* Selected tags */}
+            {/* Selected tags as chips */}
             {selectedTags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
                 {selectedTags.map(tag => (
@@ -835,66 +837,91 @@ export default function UploadPage() {
                 ))}
               </div>
             )}
-            {/* Tag input with suggestions */}
-            <div className="relative">
-              <Input
-                className="mt-1"
-                placeholder="הקלידו לחיפוש או הוספת תגית חדשה..."
-                value={tagInput}
-                onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
-                onFocus={() => setShowTagSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && tagInput.trim()) {
-                    e.preventDefault();
-                    const newTag = tagInput.trim();
-                    if (!selectedTags.includes(newTag)) {
-                      setSelectedTags(prev => [...prev, newTag]);
+            {/* Tag input with + button and suggestions */}
+            <div className="flex gap-1.5 mt-1">
+              <div className="relative flex-1">
+                <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
+                <Input
+                  ref={tagInputRef}
+                  className="pr-10"
+                  placeholder="הקלידו לחיפוש או הוספת תגית חדשה..."
+                  value={tagInput}
+                  onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                  onFocus={() => setShowTagSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && tagInput.trim()) {
+                      e.preventDefault();
+                      const newTag = tagInput.trim();
+                      if (!selectedTags.includes(newTag)) {
+                        setSelectedTags(prev => [...prev, newTag]);
+                      }
+                      setTagInput('');
+                      setShowTagSuggestions(false);
                     }
-                    setTagInput('');
-                    setShowTagSuggestions(false);
-                  }
-                }}
-              />
-              {showTagSuggestions && (tagInput || availableTags.length > 0) && (
-                <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-40 overflow-auto">
-                  {availableTags
-                    .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
-                    .slice(0, 10)
-                    .map(tag => (
+                  }}
+                />
+                {showTagSuggestions && (tagInput || availableTags.length > 0) && (
+                  <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-48 overflow-auto">
+                    {/* Create new tag option — always visible at top when typing */}
+                    {tagInput.trim() && !selectedTags.includes(tagInput.trim()) && (
                       <button
-                        key={tag.name}
                         type="button"
-                        className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors"
+                        className="w-full text-right px-3 py-2 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors flex items-center gap-1.5 border-b border-[#E8E8E8]"
                         onMouseDown={e => {
                           e.preventDefault();
-                          setSelectedTags(prev => [...prev, tag.name]);
+                          setSelectedTags(prev => [...prev, tagInput.trim()]);
                           setTagInput('');
                           setShowTagSuggestions(false);
                         }}
                       >
-                        {tag.name}
+                        <Plus className="w-3.5 h-3.5" />
+                        {availableTags.some(t => t.name === tagInput.trim()) ? `הוסף "${tagInput.trim()}"` : `צור תגית חדשה "${tagInput.trim()}"`}
                       </button>
-                    ))}
-                  {tagInput.trim() && !availableTags.some(t => t.name === tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
-                    <button
-                      type="button"
-                      className="w-full text-right px-3 py-1.5 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors border-t border-[#E8E8E8]"
-                      onMouseDown={e => {
-                        e.preventDefault();
-                        setSelectedTags(prev => [...prev, tagInput.trim()]);
-                        setTagInput('');
-                        setShowTagSuggestions(false);
-                      }}
-                    >
-                      + הוסף &quot;{tagInput.trim()}&quot;
-                    </button>
-                  )}
-                  {availableTags.filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput))).length === 0 && !tagInput.trim() && (
-                    <p className="px-3 py-2 text-xs text-ono-gray">אין תגיות עדיין. הקלידו להוספת תגית חדשה.</p>
-                  )}
-                </div>
-              )}
+                    )}
+                    {/* Existing tag suggestions */}
+                    {availableTags
+                      .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
+                      .slice(0, 10)
+                      .map(tag => (
+                        <button
+                          key={tag.name}
+                          type="button"
+                          className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors flex items-center justify-between"
+                          onMouseDown={e => {
+                            e.preventDefault();
+                            setSelectedTags(prev => [...prev, tag.name]);
+                            setTagInput('');
+                            setShowTagSuggestions(false);
+                          }}
+                        >
+                          <span>{tag.name}</span>
+                          <span className="text-[10px] text-ono-gray">({tag.count})</span>
+                        </button>
+                      ))}
+                    {!tagInput && availableTags.filter(t => !selectedTags.includes(t.name)).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-ono-gray">אין תגיות עדיין. הקלידו להוספת תגית חדשה.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
+                onClick={() => {
+                  if (tagInput.trim() && !selectedTags.includes(tagInput.trim())) {
+                    setSelectedTags(prev => [...prev, tagInput.trim()]);
+                    setTagInput('');
+                  }
+                  tagInputRef.current?.focus();
+                  setShowTagSuggestions(true);
+                }}
+                title="הוסף תגית חדשה"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
           </div>
 
@@ -1065,7 +1092,7 @@ export default function UploadPage() {
           </div>
 
           <div>
-            <Label className="flex items-center gap-1">תגיות</Label>
+            <Label className="flex items-center gap-1">תגיות <InfoTooltip text="בחרו תגיות קיימות או הוסיפו חדשות." /></Label>
             {selectedTags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
                 {selectedTags.map(tag => (
@@ -1075,39 +1102,66 @@ export default function UploadPage() {
                 ))}
               </div>
             )}
-            <div className="relative">
-              <Input
-                className="mt-1"
-                placeholder="הקלידו לחיפוש או הוספת תגית..."
-                value={tagInput}
-                onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
-                onFocus={() => setShowTagSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && tagInput.trim()) {
-                    e.preventDefault();
-                    const newTag = tagInput.trim();
-                    if (!selectedTags.includes(newTag)) setSelectedTags(prev => [...prev, newTag]);
+            <div className="flex gap-1.5 mt-1">
+              <div className="relative flex-1">
+                <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ono-gray pointer-events-none z-10" />
+                <Input
+                  className="pr-10"
+                  placeholder="הקלידו לחיפוש או הוספת תגית חדשה..."
+                  value={tagInput}
+                  onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                  onFocus={() => setShowTagSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && tagInput.trim()) {
+                      e.preventDefault();
+                      const newTag = tagInput.trim();
+                      if (!selectedTags.includes(newTag)) setSelectedTags(prev => [...prev, newTag]);
+                      setTagInput('');
+                      setShowTagSuggestions(false);
+                    }
+                  }}
+                />
+                {showTagSuggestions && (tagInput || availableTags.length > 0) && (
+                  <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-48 overflow-auto">
+                    {tagInput.trim() && !selectedTags.includes(tagInput.trim()) && (
+                      <button type="button" className="w-full text-right px-3 py-2 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors flex items-center gap-1.5 border-b border-[#E8E8E8]" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tagInput.trim()]); setTagInput(''); setShowTagSuggestions(false); }}>
+                        <Plus className="w-3.5 h-3.5" />
+                        {availableTags.some(t => t.name === tagInput.trim()) ? `הוסף "${tagInput.trim()}"` : `צור תגית חדשה "${tagInput.trim()}"`}
+                      </button>
+                    )}
+                    {availableTags
+                      .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
+                      .slice(0, 10)
+                      .map(tag => (
+                        <button key={tag.name} type="button" className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors flex items-center justify-between" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tag.name]); setTagInput(''); setShowTagSuggestions(false); }}>
+                          <span>{tag.name}</span>
+                          <span className="text-[10px] text-ono-gray">({tag.count})</span>
+                        </button>
+                      ))}
+                    {!tagInput && availableTags.filter(t => !selectedTags.includes(t.name)).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-ono-gray">אין תגיות עדיין. הקלידו להוספת תגית חדשה.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
+                onClick={() => {
+                  if (tagInput.trim() && !selectedTags.includes(tagInput.trim())) {
+                    setSelectedTags(prev => [...prev, tagInput.trim()]);
                     setTagInput('');
-                    setShowTagSuggestions(false);
                   }
+                  tagInputRef.current?.focus();
+                  setShowTagSuggestions(true);
                 }}
-              />
-              {showTagSuggestions && (tagInput || availableTags.length > 0) && (
-                <div className="absolute z-10 top-full mt-1 w-full bg-white border border-[#E8E8E8] rounded-md shadow-lg max-h-40 overflow-auto">
-                  {availableTags
-                    .filter(t => !selectedTags.includes(t.name) && (!tagInput || t.name.includes(tagInput)))
-                    .slice(0, 10)
-                    .map(tag => (
-                      <button key={tag.name} type="button" className="w-full text-right px-3 py-1.5 text-sm hover:bg-ono-green-light/50 transition-colors" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tag.name]); setTagInput(''); setShowTagSuggestions(false); }}>{tag.name}</button>
-                    ))}
-                  {tagInput.trim() && !availableTags.some(t => t.name === tagInput.trim()) && !selectedTags.includes(tagInput.trim()) && (
-                    <button type="button" className="w-full text-right px-3 py-1.5 text-sm text-ono-green font-medium hover:bg-ono-green-light/50 transition-colors border-t border-[#E8E8E8]" onMouseDown={e => { e.preventDefault(); setSelectedTags(prev => [...prev, tagInput.trim()]); setTagInput(''); setShowTagSuggestions(false); }}>
-                      + הוסף &quot;{tagInput.trim()}&quot;
-                    </button>
-                  )}
-                </div>
-              )}
+                title="הוסף תגית חדשה"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
           </div>
 
