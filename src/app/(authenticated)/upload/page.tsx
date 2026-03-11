@@ -110,7 +110,6 @@ export default function UploadPage() {
   const [newSlugParent, setNewSlugParent] = useState('');
   const [savingSlug, setSavingSlug] = useState(false);
   const [slugError, setSlugError] = useState('');
-  const [userCanManage, setUserCanManage] = useState(false);
 
   // Quick initiative creation
   const [showInitiativeModal, setShowInitiativeModal] = useState(false);
@@ -144,13 +143,6 @@ export default function UploadPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  // Check user permissions for quick-create
-  useEffect(() => {
-    fetch('/api/users/me').then(r => r.ok ? r.json() : null).then(profile => {
-      if (profile?.permissions?.can_manage_campaigns) setUserCanManage(true);
-    }).catch(() => {});
-  }, []);
 
   const filteredInitiatives = initiatives.filter(
     (i) => !i.slug_id || i.slug_id === selectedSlug
@@ -741,18 +733,16 @@ export default function UploadPage() {
                   emptyOptionLabel="בחר סלאג..."
                   emptyLabel="לא נמצאו סלאגים"
                 />
-                {userCanManage && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
-                    onClick={() => { setShowSlugModal(true); setSlugError(''); }}
-                    title="צור סלאג חדש"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
+                  onClick={() => { setShowSlugModal(true); setSlugError(''); }}
+                  title="צור סלאג חדש"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
               </div>
             </div>
 
@@ -1034,18 +1024,16 @@ export default function UploadPage() {
                   emptyOptionLabel="בחר סלאג..."
                   emptyLabel="לא נמצאו סלאגים"
                 />
-                {userCanManage && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
-                    onClick={() => { setShowSlugModal(true); setSlugError(''); }}
-                    title="צור סלאג חדש"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 h-[38px] px-2.5 border-ono-green text-ono-green hover:bg-ono-green-light"
+                  onClick={() => { setShowSlugModal(true); setSlugError(''); }}
+                  title="צור סלאג חדש"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
               </div>
             </div>
 
