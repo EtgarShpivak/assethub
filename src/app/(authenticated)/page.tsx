@@ -49,6 +49,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardClient
+      userName={user.user_metadata?.full_name || ''}
       totalAssets={assetsResult.count || 0}
       activeInitiatives={initiativesResult.count || 0}
       unclassifiedCount={unclassifiedResult.count || 0}

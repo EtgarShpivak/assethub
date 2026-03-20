@@ -36,6 +36,7 @@ interface AnalyticsData {
 }
 
 interface DashboardClientProps {
+  userName?: string;
   totalAssets: number;
   activeInitiatives: number;
   unclassifiedCount: number;
@@ -144,6 +145,7 @@ function PendingApprovalsWidget() {
 }
 
 export function DashboardClient({
+  userName,
   totalAssets,
   activeInitiatives,
   unclassifiedCount,
@@ -198,8 +200,106 @@ export function DashboardClient({
 
   const otherCount = totalAssets - imageCount - videoCount - pdfCount;
 
+  // Mobile recent assets (unfiltered, first 4)
+  const mobileRecentAssets = recentAssets.slice(0, 4);
+
   return (
     <div className="space-y-6">
+      {/* Mobile Dashboard */}
+      <div className="md:hidden space-y-5">
+        {/* Greeting */}
+        <div>
+          <h1 className="text-xl font-bold text-ono-gray-dark dark:text-gray-100">
+            {userName ? `שלום, ${userName}` : 'שלום'}
+          </h1>
+          <p className="text-sm text-ono-gray dark:text-gray-400 mt-1">סקירה מהירה של המערכת</p>
+        </div>
+
+        {/* 4 stat cards in 2x2 grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/assets" className="border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center bg-white dark:bg-gray-800 dark:border-gray-700">
+            <FolderOpen className="w-5 h-5 text-ono-green mx-auto mb-1" />
+            <p className="text-2xl font-bold text-ono-gray-dark dark:text-gray-100">{totalAssets}</p>
+            <p className="text-[10px] text-ono-gray dark:text-gray-400">סה&quot;כ חומרים</p>
+          </Link>
+          <Link href="/initiatives" className="border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center bg-white dark:bg-gray-800 dark:border-gray-700">
+            <Megaphone className="w-5 h-5 text-ono-orange mx-auto mb-1" />
+            <p className="text-2xl font-bold text-ono-gray-dark dark:text-gray-100">{activeInitiatives}</p>
+            <p className="text-[10px] text-ono-gray dark:text-gray-400">קמפיינים פעילים</p>
+          </Link>
+          <Link href="/approvals" className="border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center bg-white dark:bg-gray-800 dark:border-gray-700">
+            <ClipboardCheck className="w-5 h-5 text-amber-500 mx-auto mb-1" />
+            <p className="text-2xl font-bold text-ono-gray-dark dark:text-gray-100">{unclassifiedCount}</p>
+            <p className="text-[10px] text-ono-gray dark:text-gray-400">ממתינים לסיווג</p>
+          </Link>
+          <Link href="/assets?expiry=expiring_7days" className={`border rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center bg-white dark:bg-gray-800 dark:border-gray-700 ${expiringSoonCount > 0 ? 'border-red-200' : 'border-[#E8E8E8]'}`}>
+            <Clock className={`w-5 h-5 mx-auto mb-1 ${expiringSoonCount > 0 ? 'text-red-500' : 'text-ono-gray'}`} />
+            <p className={`text-2xl font-bold ${expiringSoonCount > 0 ? 'text-red-600' : 'text-ono-gray-dark dark:text-gray-100'}`}>{expiringSoonCount}</p>
+            <p className="text-[10px] text-ono-gray dark:text-gray-400">פוקעים בקרוב</p>
+          </Link>
+        </div>
+
+        {/* Quick action buttons */}
+        <div className="grid grid-cols-3 gap-3">
+          <Link
+            href="/upload"
+            className="flex flex-col items-center gap-2 p-4 bg-gradient-to-b from-ono-green to-ono-green-dark rounded-lg text-white"
+          >
+            <Upload className="w-6 h-6" />
+            <span className="text-xs font-bold">העלאה</span>
+          </Link>
+          <Link
+            href="/assets"
+            className="flex flex-col items-center gap-2 p-4 border border-[#E8E8E8] rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700"
+          >
+            <FolderOpen className="w-6 h-6 text-ono-gray-dark dark:text-gray-100" />
+            <span className="text-xs font-bold text-ono-gray-dark dark:text-gray-100">ספרייה</span>
+          </Link>
+          <Link
+            href="/approvals"
+            className="flex flex-col items-center gap-2 p-4 border border-[#E8E8E8] rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700"
+          >
+            <ClipboardCheck className="w-6 h-6 text-amber-500" />
+            <span className="text-xs font-bold text-ono-gray-dark dark:text-gray-100">אישורים</span>
+          </Link>
+        </div>
+
+        {/* Recent uploads - 2x2 grid */}
+        {mobileRecentAssets.length > 0 && (
+          <div className="border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 bg-white dark:bg-gray-800 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-ono-gray-dark dark:text-gray-100">העלאות אחרונות</h2>
+              <Link href="/assets" className="text-xs text-ono-green hover:text-ono-green-dark">
+                הצג הכל
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {mobileRecentAssets.map((asset) => (
+                <Link
+                  key={asset.id}
+                  href={`/assets?id=${asset.id}`}
+                  className="border border-[#E8E8E8] rounded-lg p-2 hover:border-ono-green transition-colors block dark:border-gray-700"
+                >
+                  <div className="aspect-square bg-ono-gray-light dark:bg-gray-700 rounded-md flex items-center justify-center mb-2 overflow-hidden">
+                    {asset.drive_view_url && asset.file_type === 'image' ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={asset.drive_view_url} alt={asset.original_filename} className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <FileTypeIcon type={asset.file_type} />
+                    )}
+                  </div>
+                  <p className="text-xs text-ono-gray-dark dark:text-gray-100 font-medium truncate">
+                    {asset.stored_filename || asset.original_filename}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Dashboard */}
+      <div className="hidden md:block space-y-6">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-ono-gray-dark">דשבורד</h1>
         <InfoTooltip text="סקירה כללית של המערכת: חומרים, קמפיינים פעילים, העלאות אחרונות וחומרים שממתינים לסיווג." size="md" />
@@ -657,6 +757,7 @@ export function DashboardClient({
             <p className="text-sm text-ono-gray">נתוני אנליטיקה לא זמינים כרגע</p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

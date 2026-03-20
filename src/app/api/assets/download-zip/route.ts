@@ -17,7 +17,12 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'גוף הבקשה לא תקין' }, { status: 400 });
   }
-  const { asset_ids, share_token } = body as { asset_ids?: string[]; share_token?: string };
+  const { asset_ids, share_token, naming, initiative_id } = body as {
+    asset_ids?: string[];
+    share_token?: string;
+    naming?: 'original' | 'smart' | 'campaign' | 'sequential';
+    initiative_id?: string;
+  };
 
   // If not authenticated, require a valid share token
   if (!user && !share_token) {
@@ -54,6 +59,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Fetch initiative details if needed for naming
+  let initiativeShortCode: string | null = null;
+  let initiativeName: string | null = null;
+
+  if (initiative_id && (naming === 'campaign' || naming === 'sequential')) {
+    const { data: initiative } = await supabase
+      .from('initiatives')
+      .select('short_code, name')
+      .eq('id', initiative_id)
+      .single();
+
+    if (initiative) {
+      initiativeShortCode = initiative.short_code;
+      initiativeName = initiative.name;
+    }
+  }
+
   // Get all selected assets
   const { data: assets, error } = await supabase
     .from('assets')
@@ -69,6 +91,7 @@ export async function POST(request: NextRequest) {
 
   // Track filenames to avoid duplicates
   const usedNames = new Map<string, number>();
+  let sequentialIndex = 1;
 
   for (const asset of assets) {
     if (!asset.drive_file_id) continue;
@@ -83,15 +106,42 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Use stored_filename (smart name) for the zip entry
-      let filename = asset.stored_filename || asset.original_filename;
+      // Determine filename based on naming preset
+      let filename: string;
+      const namingMode = naming || 'original';
+
+      switch (namingMode) {
+        case 'smart':
+          filename = asset.stored_filename || asset.original_filename;
+          break;
+        case 'campaign':
+          if (initiativeShortCode) {
+            filename = `${initiativeShortCode}_${asset.stored_filename || asset.original_filename}`;
+          } else {
+            filename = asset.stored_filename || asset.original_filename;
+          }
+          break;
+        case 'sequential': {
+          const ext = (asset.stored_filename || asset.original_filename).split('.').pop() || '';
+          const prefix = initiativeName || 'asset';
+          filename = `${prefix}_${String(sequentialIndex).padStart(2, '0')}.${ext}`;
+          sequentialIndex++;
+          break;
+        }
+        case 'original':
+        default:
+          filename = asset.original_filename || asset.stored_filename;
+          break;
+      }
+
+      // Deduplicate filenames
       const count = usedNames.get(filename) || 0;
       if (count > 0) {
         const ext = filename.split('.').pop() || '';
         const base = filename.slice(0, filename.length - ext.length - 1);
         filename = `${base}_${count}.${ext}`;
       }
-      usedNames.set(asset.stored_filename || asset.original_filename, count + 1);
+      usedNames.set(filename, count + 1);
 
       const arrayBuffer = await fileData.arrayBuffer();
       zip.file(filename, arrayBuffer);
@@ -106,9 +156,13 @@ export async function POST(request: NextRequest) {
     compressionOptions: { level: 5 },
   });
 
+  // Build ZIP filename — include initiative short_code when available
+  const zipPrefix = initiativeShortCode ? `${initiativeShortCode}_assets` : 'assethub_download';
+  const zipFilename = `${zipPrefix}_${Date.now()}.zip`;
+
   const headers = new Headers();
   headers.set('Content-Type', 'application/zip');
-  headers.set('Content-Disposition', `attachment; filename="assethub_download_${Date.now()}.zip"`);
+  headers.set('Content-Disposition', `attachment; filename="${zipFilename}"`);
   headers.set('Content-Length', zipBuffer.byteLength.toString());
 
   return new NextResponse(zipBuffer, { headers });

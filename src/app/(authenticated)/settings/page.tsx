@@ -25,6 +25,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   Search,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +68,29 @@ const PERM_ICONS: Record<string, typeof Eye> = {
   can_manage_users: Users,
   can_view_activity_log: ScrollText,
 };
+
+interface SessionUser {
+  display_name: string;
+  email: string;
+  last_sign_in_at: string | null;
+  created_at: string;
+}
+
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return 'טרם התחבר';
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'עכשיו';
+  if (diffMin < 60) return `לפני ${diffMin} דקות`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `לפני ${diffHours} שעות`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `לפני ${diffDays} ימים`;
+  const diffMonths = Math.floor(diffDays / 30);
+  return `לפני ${diffMonths} חודשים`;
+}
 
 type UserFilter = 'all' | 'active' | 'inactive' | 'deleted';
 type UserSort = 'display_name' | 'last_login' | 'created_at' | 'email';
@@ -111,6 +135,10 @@ export default function SettingsPage() {
   const [deleteUser, setDeleteUser] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  // Session activity
+  const [sessionUsers, setSessionUsers] = useState<SessionUser[]>([]);
+  const [sessionLoading, setSessionLoading] = useState(false);
 
   // Re-invite
   const [reinviting, setReinviting] = useState<string | null>(null);
@@ -191,6 +219,20 @@ export default function SettingsPage() {
     });
   };
 
+  const fetchSessionActivity = async () => {
+    setSessionLoading(true);
+    try {
+      const res = await fetch('/api/admin/sessions');
+      if (res.ok) {
+        const data = await res.json();
+        setSessionUsers(data);
+      }
+    } catch {
+      logClientError('settings-fetch-sessions', 'Failed to fetch session activity');
+    }
+    setSessionLoading(false);
+  };
+
   useEffect(() => {
     if (currentUserId) {
       fetchMyProfile().then(() => fetchUsers());
@@ -201,6 +243,9 @@ export default function SettingsPage() {
   useEffect(() => {
     if (isAdmin && users.length === 0 && !loading) {
       fetchUsers();
+    }
+    if (isAdmin) {
+      fetchSessionActivity();
     }
   }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -633,6 +678,62 @@ export default function SettingsPage() {
               })
             )}
           </div>
+        </div>
+      )}
+
+      {/* Session Activity Section */}
+      {isAdmin && (
+        <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-ono-green" />
+              <h2 className="text-lg font-bold text-ono-gray-dark">פעילות התחברות</h2>
+              <InfoTooltip text="מציג את זמן ההתחברות האחרון של כל משתמש במערכת." />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchSessionActivity}
+              disabled={sessionLoading}
+            >
+              <RefreshCw className={`w-4 h-4 ml-1 ${sessionLoading ? 'animate-spin' : ''}`} />
+              רענן
+            </Button>
+          </div>
+          {sessionLoading && sessionUsers.length === 0 ? (
+            <p className="text-ono-gray text-sm">טוען...</p>
+          ) : sessionUsers.length === 0 ? (
+            <p className="text-ono-gray text-sm text-center py-4">אין נתונים</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#E8E8E8]">
+                    <th className="text-right py-2 px-3 text-xs font-medium text-ono-gray">שם</th>
+                    <th className="text-right py-2 px-3 text-xs font-medium text-ono-gray">אימייל</th>
+                    <th className="text-right py-2 px-3 text-xs font-medium text-ono-gray">התחברות אחרונה</th>
+                    <th className="text-right py-2 px-3 text-xs font-medium text-ono-gray">הצטרפות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionUsers.map((su, idx) => (
+                    <tr key={idx} className="border-b border-[#E8E8E8] last:border-b-0 hover:bg-ono-gray-light/30">
+                      <td className="py-2 px-3 text-ono-gray-dark font-medium">{su.display_name}</td>
+                      <td className="py-2 px-3 text-ono-gray" dir="ltr">{su.email}</td>
+                      <td className="py-2 px-3">
+                        {su.last_sign_in_at ? (
+                          <span className="text-ono-green-dark">{formatRelativeTime(su.last_sign_in_at)}</span>
+                        ) : (
+                          <span className="text-ono-orange">טרם התחבר</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-ono-gray">{new Date(su.created_at).toLocaleDateString('he-IL')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

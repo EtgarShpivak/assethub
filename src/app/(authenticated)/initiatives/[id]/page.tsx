@@ -16,10 +16,12 @@ import {
   Loader2,
   Share2,
   Check,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { INITIATIVE_STATUSES, PLATFORMS } from '@/lib/platform-specs';
+import { AssetComparison } from '@/components/assets/asset-comparison';
 import type { Initiative, Asset } from '@/lib/types';
 
 const statusBadgeStyles: Record<string, string> = {
@@ -48,6 +50,7 @@ export default function InitiativeDetailPage() {
   const [downloading, setDownloading] = useState(false);
   const [sharingCampaign, setSharingCampaign] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/initiatives/${params.id}`)
@@ -175,6 +178,15 @@ export default function InitiativeDetailPage() {
             <Button
               size="sm"
               variant="outline"
+              onClick={() => setComparisonOpen(true)}
+              disabled={!initiative?.assets || initiative.assets.length < 2}
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 ml-1" />
+              השוואה
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={handleShareCampaign}
               disabled={sharingCampaign || !initiative?.assets?.length}
             >
@@ -252,6 +264,25 @@ export default function InitiativeDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Asset Comparison Modal */}
+      {initiative.assets && initiative.assets.length >= 2 && (
+        <AssetComparison
+          open={comparisonOpen}
+          onClose={() => setComparisonOpen(false)}
+          assets={initiative.assets.map((a) => ({
+            id: a.id,
+            original_filename: a.original_filename,
+            stored_filename: a.stored_filename || a.original_filename,
+            width: a.width_px ?? undefined,
+            height: a.height_px ?? undefined,
+            file_size: a.file_size_bytes ?? 0,
+            mime_type: a.mime_type ?? 'application/octet-stream',
+            platforms: a.platforms ?? undefined,
+            drive_view_url: a.drive_view_url ?? undefined,
+          }))}
+        />
+      )}
     </div>
   );
 }
