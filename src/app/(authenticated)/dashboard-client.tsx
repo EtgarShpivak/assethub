@@ -19,6 +19,7 @@ import {
   Tag as TagIcon,
   Eye,
   Clock,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
@@ -94,6 +95,53 @@ const PLATFORM_LABELS: Record<string, string> = {
 const FILE_TYPE_LABELS: Record<string, string> = {
   image: 'תמונות', video: 'וידאו', pdf: 'PDF', newsletter: 'ידיעון', other: 'אחר',
 };
+
+function PendingApprovalsWidget() {
+  const [pendingCount, setPendingCount] = useState(0);
+  const [myPendingCount, setMyPendingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/approvals?status=pending').then(r => r.ok ? r.json() : { rounds: [] }),
+      fetch('/api/approvals/pending').then(r => r.ok ? r.json() : { rounds: [] }),
+    ]).then(([created, pending]) => {
+      setPendingCount(created.rounds?.length || 0);
+      setMyPendingCount(pending.rounds?.length || 0);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading || (pendingCount === 0 && myPendingCount === 0)) return null;
+
+  return (
+    <div className="bg-gradient-to-l from-amber-50 to-white border border-amber-200 rounded-xl p-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+          <ClipboardCheck className="w-5 h-5 text-amber-600" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-ono-gray-dark">אישורים ממתינים</p>
+          <p className="text-xs text-ono-gray">
+            {myPendingCount > 0 && `${myPendingCount} ממתינים לאישורך`}
+            {myPendingCount > 0 && pendingCount > 0 && ' · '}
+            {pendingCount > 0 && `${pendingCount} סבבים שיצרת ממתינים`}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        {myPendingCount > 0 && (
+          <Link href="/approvals/pending" className="px-3 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 transition-colors">
+            אשר עכשיו
+          </Link>
+        )}
+        <Link href="/approvals" className="px-3 py-1.5 bg-white text-amber-700 text-xs font-medium rounded-lg border border-amber-200 hover:bg-amber-50 transition-colors">
+          צפה בהכל
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 export function DashboardClient({
   totalAssets,
@@ -185,6 +233,24 @@ export function DashboardClient({
         </Link>
       </div>
 
+      {/* Asset Expiry Warnings */}
+      {expiringSoonCount > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-red-700">⚠️ {expiringSoonCount} חומרים פוקעים בקרוב!</p>
+              <p className="text-xs text-red-500">חומרים שתוקפם פג תוך 7 ימים. בדקו ועדכנו תאריכי תפוגה.</p>
+            </div>
+          </div>
+          <Link href="/assets?expiry=expiring_7days" className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors shrink-0">
+            צפה בחומרים
+          </Link>
+        </div>
+      )}
+
       {/* Stats cards - 2 rows */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Link href="/assets" className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 text-center hover:border-ono-green transition-colors">
@@ -218,6 +284,9 @@ export function DashboardClient({
           <p className="text-[10px] text-ono-gray">פוקעים ב-7 ימים</p>
         </Link>
       </div>
+
+      {/* Pending Approvals Widget */}
+      <PendingApprovalsWidget />
 
       {/* Content type breakdown */}
       {totalAssets > 0 && (

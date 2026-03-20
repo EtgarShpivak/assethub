@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -105,6 +105,15 @@ export function Sidebar({ userRole }: { userRole?: string }) {
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(getInitialOpen);
 
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/approvals/pending')
+      .then(r => r.ok ? r.json() : { rounds: [] })
+      .then(data => setPendingApprovalCount(data.rounds?.length || 0))
+      .catch(() => {});
+  }, []);
+
   const toggleGroup = (key: string) => {
     setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -128,8 +137,8 @@ export function Sidebar({ userRole }: { userRole?: string }) {
             isChild ? 'px-5 py-2 pr-10' : 'px-4 py-2.5',
             item.adminOnly ? 'border-r-2 border-r-red-200' : '',
             isActive
-              ? 'bg-ono-green-light border-l-[3px] border-l-ono-green text-ono-gray-dark font-bold'
-              : 'text-ono-gray hover:bg-ono-gray-light hover:text-ono-gray-dark'
+              ? 'bg-ono-green-light border-l-[3px] border-l-ono-green text-ono-gray-dark font-bold dark:bg-gray-700 dark:text-white'
+              : 'text-ono-gray hover:bg-ono-gray-light hover:text-ono-gray-dark dark:text-gray-300 dark:hover:bg-gray-700'
           )}
         >
           <Icon className={cn('w-4 h-4 shrink-0', item.adminOnly && !isActive ? 'text-red-400' : '', isChild ? 'w-4 h-4' : 'w-5 h-5')} />
@@ -161,19 +170,24 @@ export function Sidebar({ userRole }: { userRole?: string }) {
           className={cn(
             'flex items-center gap-3 px-4 py-2.5 text-sm transition-colors w-full text-right',
             hasActiveChild
-              ? 'text-ono-gray-dark font-bold'
-              : 'text-ono-gray hover:bg-ono-gray-light hover:text-ono-gray-dark'
+              ? 'text-ono-gray-dark font-bold dark:text-white'
+              : 'text-ono-gray hover:bg-ono-gray-light hover:text-ono-gray-dark dark:text-gray-300 dark:hover:bg-gray-700'
           )}
         >
           <Icon className="w-5 h-5 shrink-0" />
           <span className="flex-1">{t(group.labelKey)}</span>
+          {group.labelKey === 'nav.approvals' && pendingApprovalCount > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              {pendingApprovalCount}
+            </span>
+          )}
           <ChevronDown className={cn(
             'w-4 h-4 shrink-0 transition-transform duration-200',
             isOpen ? 'rotate-180' : ''
           )} />
         </button>
         {isOpen && (
-          <ul className="bg-[#FAFAFA]">
+          <ul className="bg-[#FAFAFA] dark:bg-gray-750">
             {visibleChildren.map(child => renderLink(child, true))}
           </ul>
         )}
@@ -182,9 +196,9 @@ export function Sidebar({ userRole }: { userRole?: string }) {
   };
 
   return (
-    <aside className="w-60 bg-white border-l border-[#E8E8E8] flex flex-col h-full shrink-0">
+    <aside className="w-60 bg-white dark:bg-gray-800 border-l border-[#E8E8E8] dark:border-gray-700 flex flex-col h-full shrink-0">
       {/* Ono Logo + Title */}
-      <div className="px-4 pt-5 pb-4 border-b border-[#E8E8E8]">
+      <div className="px-4 pt-5 pb-4 border-b border-[#E8E8E8] dark:border-gray-700">
         <div className="flex flex-col items-center gap-2">
           <Image
             src="/ono-logo.png"
@@ -193,10 +207,10 @@ export function Sidebar({ userRole }: { userRole?: string }) {
             height={79}
             priority
           />
-          <h2 className="text-sm font-bold text-ono-gray-dark text-center leading-tight">
+          <h2 className="text-sm font-bold text-ono-gray-dark dark:text-white text-center leading-tight">
             {t('sidebar.mediaManagement')}
           </h2>
-          <span className="text-[10px] text-ono-gray text-center">
+          <span className="text-[10px] text-ono-gray dark:text-gray-400 text-center">
             {t('sidebar.onoAcademic')}
           </span>
         </div>

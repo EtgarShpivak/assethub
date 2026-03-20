@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LogOut, User, Search, Globe } from 'lucide-react';
+import { LogOut, User, Search, Globe, Moon, Sun } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTranslation } from '@/lib/i18n/provider';
+import { useTheme } from '@/lib/dark-mode';
 
 interface TopNavProps {
   userName?: string | null;
@@ -21,6 +22,7 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
   const router = useRouter();
   const supabase = createClient();
   const { t, locale, setLocale, dir } = useTranslation();
+  const { isDark, setTheme } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -37,14 +39,14 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
   };
 
   return (
-    <header role="banner" className="h-14 bg-white border-b border-[#E8E8E8] flex items-center justify-between px-6 shrink-0">
+    <header role="banner" className="h-14 bg-white dark:bg-gray-800 border-b border-[#E8E8E8] dark:border-gray-700 flex items-center justify-between px-6 shrink-0">
       {/* Logo on the right (RTL) */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-ono-green rounded-lg flex items-center justify-center" aria-hidden="true">
             <span className="text-white font-bold text-sm">AH</span>
           </div>
-          <span className="font-bold text-lg text-ono-gray-dark">{t('nav.mediaManagement')}</span>
+          <span className="font-bold text-lg text-ono-gray-dark dark:text-white">{t('nav.mediaManagement')}</span>
         </div>
       </div>
 
@@ -52,17 +54,27 @@ export function TopNav({ userName, userEmail }: TopNavProps) {
       <button
         onClick={openSearch}
         aria-label={t('a11y.openSearch')}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm text-ono-gray bg-ono-gray-light rounded-lg hover:bg-[#E8E8E8] transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 text-sm text-ono-gray dark:text-gray-400 bg-ono-gray-light dark:bg-gray-700 rounded-lg hover:bg-[#E8E8E8] dark:hover:bg-gray-600 transition-colors"
       >
         <Search className="w-4 h-4" aria-hidden="true" />
         <span className="hidden sm:inline">{t('topnav.search')}</span>
-        <kbd className="hidden sm:inline text-[10px] bg-white px-1.5 py-0.5 rounded border border-[#E8E8E8]">
+        <kbd className="hidden sm:inline text-[10px] bg-white dark:bg-gray-600 px-1.5 py-0.5 rounded border border-[#E8E8E8] dark:border-gray-500">
           {t('topnav.searchHint')}
         </kbd>
       </button>
 
       {/* User menu + language toggle on the left (RTL) */}
       <div className="flex items-center gap-2">
+        {/* Dark mode toggle */}
+        <button
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          className="p-2 rounded-lg hover:bg-ono-gray-light dark:hover:bg-gray-700 transition-colors"
+          title={isDark ? 'Light mode' : 'Dark mode'}
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {isDark ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-ono-gray" />}
+        </button>
+
         {/* Language toggle */}
         <Button
           variant="ghost"

@@ -327,6 +327,24 @@ export default function PublicApprovalReviewPage() {
         </div>
       </header>
 
+      {/* Quick Approve Banner - shown on mobile when status is pending */}
+      {my_status === 'pending' && round.approval_round_assets.filter(a => a.assets).length > 1 && (
+        <div className="md:hidden bg-green-50 border-b border-green-200 px-4 py-3">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <span className="text-sm text-green-700 font-medium">
+              {round.approval_round_assets.filter(a => a.assets).length} חומרים לבדיקה
+            </span>
+            <button
+              onClick={() => handleAction('approved')}
+              disabled={submitting}
+              className="px-4 py-1.5 bg-green-500 text-white text-sm font-bold rounded-lg hover:bg-green-600 active:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              ✓ אשר הכל
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-4xl mx-auto px-4 py-4 pb-32 md:pb-8">
         <div className="md:flex md:gap-6">
           {/* Left: Assets */}

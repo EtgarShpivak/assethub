@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,11 @@ export async function GET(
 
   if (revErr || !reviewer) {
     return NextResponse.json({ error: 'Invalid review link' }, { status: 404 });
+  }
+
+  // Check link expiry (if expires_at is set)
+  if (reviewer.expires_at && new Date(reviewer.expires_at) < new Date()) {
+    return NextResponse.json({ error: 'Review link has expired' }, { status: 410 });
   }
 
   // Get the full round with assets, reviewers, comments
@@ -141,6 +147,24 @@ export async function POST(
     .from('approval_rounds')
     .update({ status: newRoundStatus, updated_at: new Date().toISOString() })
     .eq('id', reviewer.round_id);
+
+  // Audit trail: log approval action with IP and user-agent
+  const userAgent = request.headers.get('user-agent') || 'unknown';
+  await logActivity(request, {
+    action: action === 'approved' ? 'approve' : 'request_changes',
+    entityType: 'approval',
+    entityId: reviewer.round_id,
+    entityName: nameToUse,
+    userId: reviewer.user_id || undefined,
+    metadata: {
+      reviewer_email: reviewer.email,
+      reviewer_id: reviewer.id,
+      ip: ip,
+      user_agent: userAgent,
+      round_status: newRoundStatus,
+      comment: comment?.trim() || null,
+    },
+  });
 
   return NextResponse.json({ success: true, round_status: newRoundStatus });
 }

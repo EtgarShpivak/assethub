@@ -5,7 +5,7 @@ import { useTranslation } from '@/lib/i18n/provider';
 import {
   ClipboardCheck, Plus, Users, Image as ImageIcon, Clock,
   CheckCircle2, AlertCircle, XCircle, Copy, Check, Trash2, ExternalLink,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, MessageCircle
 } from 'lucide-react';
 import type { ApprovalRound, ApprovalReviewer } from '@/lib/types';
 
@@ -309,13 +309,26 @@ function RoundCard({ round, onDelete, onRefresh }: {
                     <ReviewerChip reviewer={r} />
                     <span className="text-xs text-ono-gray">{r.email}</span>
                   </div>
-                  <button
-                    onClick={() => copyLink(r.token)}
-                    className="flex items-center gap-1 text-xs text-ono-green hover:underline"
-                  >
-                    {copiedToken === r.token ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    {copiedToken === r.token ? t('approval.linkCopied') : t('approval.copyLink')}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => copyLink(r.token)}
+                      className="flex items-center gap-1 text-xs text-ono-green hover:underline"
+                    >
+                      {copiedToken === r.token ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {copiedToken === r.token ? t('approval.linkCopied') : t('approval.copyLink')}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const url = `${window.location.origin}/approve/${r.token}`;
+                        const text = `\u{1F4CB} ${round.title}\n\u05E0\u05D0 \u05DC\u05D1\u05D3\u05D5\u05E7 \u05D5\u05DC\u05D0\u05E9\u05E8:\n${url}`;
+                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="flex items-center gap-1 text-xs text-green-600 hover:underline"
+                    >
+                      <MessageCircle className="w-3 h-3" /> WhatsApp
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

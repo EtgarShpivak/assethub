@@ -8,6 +8,7 @@ import {
   Calendar,
   FolderOpen,
   Globe,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,7 @@ const statusBadgeStyles: Record<string, string> = {
 };
 
 export default function InitiativesPage() {
-  const [initiatives, setInitiatives] = useState<(Initiative & { slugs?: { slug: string; display_name: string } | null; asset_count?: number })[]>([]);
+  const [initiatives, setInitiatives] = useState<(Initiative & { slugs?: { slug: string; display_name: string } | null; asset_count?: number; updated_at?: string })[]>([]);
   const [slugs, setSlugs] = useState<Slug[]>([]);
   const [, setWorkspaces] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,6 +194,12 @@ export default function InitiativesPage() {
                     <FolderOpen className="w-3 h-3 ml-1" />
                     {initiative.asset_count || 0} חומרים
                   </Badge>
+                  {initiative.updated_at && (
+                    <span className="flex items-center gap-1 text-xs text-ono-gray">
+                      <Clock className="w-3 h-3" />
+                      {new Date(initiative.updated_at).toLocaleDateString('he-IL')}
+                    </span>
+                  )}
                   <Badge className={`${statusBadgeStyles[initiative.status]} text-xs`}>
                     {INITIATIVE_STATUSES.find(s => s.value === initiative.status)?.label}
                   </Badge>

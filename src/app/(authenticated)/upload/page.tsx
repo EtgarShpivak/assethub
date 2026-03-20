@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Link as LinkIcon,
   Tag,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ import { useGlobalToast } from '@/components/ui/global-toast';
 import { logClientError } from '@/lib/error-logger';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import type { Slug, Initiative } from '@/lib/types';
+import { CreateApprovalDialog } from '@/components/assets/create-approval-dialog';
 
 interface FileEntry {
   file: File;
@@ -104,6 +106,8 @@ export default function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState<Record<string, 'pending' | 'uploading' | 'done' | 'error'>>({});
   const [filePercent, setFilePercent] = useState<Record<number, number>>({}); // per-file 0-100
   const [uploadResults, setUploadResults] = useState<{ uploaded: number; errors: number } | null>(null);
+  const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
 
   // Quick slug creation
   const [showSlugModal, setShowSlugModal] = useState(false);
@@ -194,6 +198,7 @@ export default function UploadPage() {
     setUploadProgress({ ...progress });
 
     let totalUploaded = 0;
+    const allUploadedIds: string[] = [];
     let totalErrors = files.filter(f => f.error).length;
     const allErrorDetails: { file: string; error: string }[] = files
       .filter(f => f.error)
@@ -383,6 +388,9 @@ export default function UploadPage() {
               if (completeRes.ok) {
                 const completeData = await completeRes.json();
                 totalUploaded += completeData.uploaded?.length || 0;
+                if (completeData.uploaded) {
+                  allUploadedIds.push(...completeData.uploaded.map((a: { id: string }) => a.id));
+                }
                 if (completeData.errors?.length) {
                   totalErrors += completeData.errors.length;
                   allErrorDetails.push(...completeData.errors);
@@ -433,6 +441,7 @@ export default function UploadPage() {
     }
 
     // Show results
+    setUploadedAssetIds(allUploadedIds);
     setUploadResults({ uploaded: totalUploaded, errors: totalErrors });
     if (totalUploaded > 0 && totalErrors === 0) {
       showSuccess(`${totalUploaded} קבצים הועלו בהצלחה`);
@@ -942,6 +951,16 @@ export default function UploadPage() {
                 {uploadResults.uploaded > 0 && <span className="text-ono-green-dark">{'\u2713'} {uploadResults.uploaded} קבצים הועלו בהצלחה</span>}
                 {uploadResults.errors > 0 && <span className="text-ono-orange mr-3">{'\u2717'} {uploadResults.errors} קבצים נכשלו</span>}
               </p>
+              {/* Post-upload approval shortcut - only for draft/raw materials */}
+              {uploadResults.uploaded > 0 && uploadedAssetIds.length > 0 && (assetType === 'draft' || assetType === 'raw_material') && (
+                <button
+                  onClick={() => setShowApprovalDialog(true)}
+                  className="mt-2 flex items-center gap-2 text-sm text-ono-green hover:text-ono-green-dark font-medium"
+                >
+                  <ClipboardCheck className="w-4 h-4" />
+                  שלח לאישור →
+                </button>
+              )}
             </div>
           )}
 
@@ -1347,6 +1366,14 @@ export default function UploadPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Approval Dialog for post-upload flow */}
+      <CreateApprovalDialog
+        open={showApprovalDialog}
+        onClose={() => setShowApprovalDialog(false)}
+        preSelectedAssetIds={uploadedAssetIds}
+        onCreated={() => setShowApprovalDialog(false)}
+      />
     </div>
   );
 }

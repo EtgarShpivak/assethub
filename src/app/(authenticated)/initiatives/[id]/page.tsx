@@ -13,6 +13,9 @@ import {
   Film,
   FileText,
   File,
+  Loader2,
+  Share2,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +45,9 @@ export default function InitiativeDetailPage() {
   const router = useRouter();
   const [initiative, setInitiative] = useState<(Initiative & { slugs?: { slug: string; display_name: string }; assets?: Asset[] }) | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [sharingCampaign, setSharingCampaign] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     fetch(`/api/initiatives/${params.id}`)
@@ -60,6 +66,49 @@ export default function InitiativeDetailPage() {
       body: JSON.stringify({ status: newStatus }),
     });
     setInitiative({ ...initiative, status: newStatus as Initiative['status'] });
+  };
+
+  const handleDownloadAll = async () => {
+    if (!initiative?.assets?.length) return;
+    setDownloading(true);
+    try {
+      const res = await fetch('/api/assets/download-zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_ids: initiative.assets.map(a => a.id) }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${initiative.short_code}-assets.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } finally { setDownloading(false); }
+  };
+
+  const handleShareCampaign = async () => {
+    if (!initiative?.assets?.length) return;
+    setSharingCampaign(true);
+    try {
+      const res = await fetch('/api/shares', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_ids: initiative.assets.map(a => a.id),
+          title: initiative.name,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const shareUrl = `${window.location.origin}/shared/${data.token}`;
+        await navigator.clipboard.writeText(shareUrl);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      }
+    } finally { setSharingCampaign(false); }
   };
 
   if (loading) {
@@ -123,6 +172,24 @@ export default function InitiativeDetailPage() {
                 העבר ל{INITIATIVE_STATUSES.find((s) => s.value === nextStatus)?.label}
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleShareCampaign}
+              disabled={sharingCampaign || !initiative?.assets?.length}
+            >
+              {shareCopied ? <Check className="w-3.5 h-3.5 ml-1" /> : sharingCampaign ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Share2 className="w-3.5 h-3.5 ml-1" />}
+              {shareCopied ? 'הקישור הועתק!' : 'שתף קמפיין'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadAll}
+              disabled={downloading || !initiative?.assets?.length}
+            >
+              {downloading ? <Loader2 className="w-3.5 h-3.5 ml-1 animate-spin" /> : <Download className="w-3.5 h-3.5 ml-1" />}
+              הורד הכל
+            </Button>
             <Button
               size="sm"
               className="bg-ono-green hover:bg-ono-green-dark text-white"

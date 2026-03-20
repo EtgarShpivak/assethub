@@ -52,12 +52,13 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
-  const { title, description, workspace_id, asset_ids, reviewers } = body as {
+  const { title, description, workspace_id, asset_ids, reviewers, link_expiry_days } = body as {
     title: string;
     description?: string;
     workspace_id: string;
     asset_ids: string[];
     reviewers: { email: string; display_name?: string }[];
+    link_expiry_days?: number;
   };
 
   if (!title || !workspace_id || !asset_ids?.length || !reviewers?.length) {
@@ -95,12 +96,17 @@ export async function POST(request: NextRequest) {
       .eq('email', r.email)
       .single();
 
+    const expiresAt = link_expiry_days
+      ? new Date(Date.now() + link_expiry_days * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+
     reviewerRows.push({
       round_id: round.id,
       email: r.email,
       display_name: r.display_name || existingUser?.display_name || null,
       user_id: existingUser?.id || null,
       token: generateToken(),
+      expires_at: expiresAt,
     });
   }
   const { data: savedReviewers } = await supabase
