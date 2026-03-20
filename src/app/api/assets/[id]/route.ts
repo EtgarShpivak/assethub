@@ -3,6 +3,27 @@ import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
+// Helper: verify the authenticated user belongs to the asset's workspace
+async function verifyUserWorkspaceAccess(userId: string, assetId: string) {
+  const supabase = createServiceRoleClient();
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('workspace_ids')
+    .eq('id', userId)
+    .single();
+  if (!profile) return { allowed: false, supabase };
+
+  const { data: asset } = await supabase
+    .from('assets')
+    .select('workspace_id')
+    .eq('id', assetId)
+    .single();
+  if (!asset) return { allowed: false, supabase };
+
+  const workspaceIds: string[] = profile.workspace_ids || [];
+  return { allowed: workspaceIds.includes(asset.workspace_id), supabase };
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -12,7 +33,10 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createServiceRoleClient();
+  const { allowed, supabase } = await verifyUserWorkspaceAccess(user.id, params.id);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { data, error } = await supabase
     .from('assets')
@@ -36,7 +60,11 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createServiceRoleClient();
+  const { allowed, supabase } = await verifyUserWorkspaceAccess(user.id, params.id);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const body = await request.json();
 
   // Whitelist allowed fields
@@ -77,7 +105,10 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createServiceRoleClient();
+  const { allowed, supabase } = await verifyUserWorkspaceAccess(user.id, params.id);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { error } = await supabase
     .from('assets')

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient, getAuthUser } from '@/lib/supabase/server';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,13 @@ export async function POST(request: NextRequest) {
 // Validate a share link
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit public share access (30 requests per minute per IP)
+    const ip = getClientIp(request);
+    const { allowed } = rateLimit(`share-access:${ip}`, { limit: 30, windowSeconds: 60 });
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
     const supabase = createServiceRoleClient();
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');

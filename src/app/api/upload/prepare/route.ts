@@ -167,7 +167,9 @@ export async function POST(request: NextRequest) {
     batchCounts[batchKey]++;
 
     const runNumber = String((existingCount || 0) + 1 + batchOffset).padStart(2, '0');
-    const storedFilename = `${namePrefix}-nodim-${runNumber}.${ext}`;
+    // Add short unique suffix to prevent "resource already exists" collisions
+    const uniqueSuffix = Date.now().toString(36).slice(-4);
+    const storedFilename = `${namePrefix}-nodim-${runNumber}-${uniqueSuffix}.${ext}`;
     const fullPath = `${storagePath}/${storedFilename}`;
 
     // Create signed upload URL

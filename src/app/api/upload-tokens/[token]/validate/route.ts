@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,6 +8,13 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  // Rate limit unauthenticated token validation (10 requests per minute per IP)
+  const ip = getClientIp(_request);
+  const { allowed } = rateLimit(`token-validate:${ip}`, { limit: 10, windowSeconds: 60 });
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const supabase = createServiceRoleClient();
 
   const { data: tokenData, error } = await supabase
