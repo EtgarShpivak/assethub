@@ -5,39 +5,34 @@ import { logActivity } from '@/lib/activity-logger';
 
 export const dynamic = 'force-dynamic';
 
-// Public: view approval round by reviewer token
+function generateToken(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  const array = new Uint8Array(24);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < 24; i++) {
+    token += chars[array[i] % chars.length];
+  }
+  return token;
+}
+
+// Public: view approval round by open token (anyone can view)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
   const ip = getClientIp(request);
-  const { allowed } = rateLimit(`approval-review:${ip}`, { limit: 20, windowSeconds: 60 });
+  const { allowed } = rateLimit(`open-review:${ip}`, { limit: 20, windowSeconds: 60 });
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const supabase = createServiceRoleClient();
 
-  // Find reviewer by token
-  const { data: reviewer, error: revErr } = await supabase
-    .from('approval_reviewers')
-    .select('*')
-    .eq('token', token)
-    .single();
-
-  if (revErr || !reviewer) {
-    return NextResponse.json({ error: 'Invalid review link' }, { status: 404 });
-  }
-
-  // Check link expiry (if expires_at is set)
-  if (reviewer.expires_at && new Date(reviewer.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'Review link has expired' }, { status: 410 });
-  }
-
-  // Get the full round with assets, reviewers, comments
-  const { data: round } = await supabase
+  // Find round by open token
+  const { data: round, error } = await supabase
     .from('approval_rounds')
     .select(`
-      id, title, description, status, current_round_number, created_by, created_at,
+      id, title, description, status, current_round_number, created_by, created_at, open_token,
       approval_round_assets(
         id, asset_id, round_number, added_at,
         assets(id, original_filename, stored_filename, file_type, mime_type,
@@ -47,10 +42,12 @@ export async function GET(
       approval_reviewers(id, email, display_name, status, responded_at),
       approval_comments(id, author_name, content, round_number, created_at)
     `)
-    .eq('id', reviewer.round_id)
+    .eq('open_token', token)
     .single();
 
-  if (!round) return NextResponse.json({ error: 'Round not found' }, { status: 404 });
+  if (error || !round) {
+    return NextResponse.json({ error: 'Invalid review link' }, { status: 404 });
+  }
 
   // Get creator name
   const { data: creator } = await supabase
@@ -64,110 +61,130 @@ export async function GET(
       ...round,
       creator_name: creator?.display_name || 'Unknown',
     },
-    my_reviewer_id: reviewer.id,
-    my_status: reviewer.status,
-    my_display_name: reviewer.display_name,
+    is_open: true,
   });
 }
 
-// Public: submit approval/comments
+// Public: submit review via open link
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
   const ip = getClientIp(request);
-  const { allowed } = rateLimit(`approval-respond:${ip}`, { limit: 20, windowSeconds: 60 });
+  const { allowed } = rateLimit(`open-review-respond:${ip}`, { limit: 20, windowSeconds: 60 });
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const supabase = createServiceRoleClient();
 
-  const { data: reviewer } = await supabase
-    .from('approval_reviewers')
-    .select('*')
-    .eq('token', token)
+  // Find round by open token
+  const { data: round } = await supabase
+    .from('approval_rounds')
+    .select('id, title, current_round_number, open_token')
+    .eq('open_token', token)
     .single();
 
-  if (!reviewer) return NextResponse.json({ error: 'Invalid review link' }, { status: 404 });
-
-  // Check link expiry (if expires_at is set)
-  if (reviewer.expires_at && new Date(reviewer.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'Review link has expired' }, { status: 410 });
-  }
+  if (!round) return NextResponse.json({ error: 'Invalid review link' }, { status: 404 });
 
   const body = await request.json();
-  const { action, comment, display_name } = body as {
+  const { action, comment, display_name, email } = body as {
     action: 'approved' | 'changes_requested';
     comment?: string;
     display_name?: string;
+    email?: string;
   };
 
   if (!action || !['approved', 'changes_requested'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
+  if (!display_name?.trim()) {
+    return NextResponse.json({ error: 'Display name is required' }, { status: 400 });
+  }
 
-  // Update reviewer name if provided (external user first time)
-  const nameToUse = display_name || reviewer.display_name || reviewer.email.split('@')[0];
+  const nameToUse = display_name.trim();
+  const emailToUse = email?.trim() || `anonymous-${Date.now()}@open-review`;
 
-  // Update reviewer status
-  await supabase
+  // Check if this person already reviewed (by email)
+  const { data: existingReviewer } = await supabase
     .from('approval_reviewers')
-    .update({
-      status: action,
-      display_name: nameToUse,
-      responded_at: new Date().toISOString(),
-    })
-    .eq('id', reviewer.id);
+    .select('id')
+    .eq('round_id', round.id)
+    .eq('email', emailToUse)
+    .single();
+
+  let reviewerId: string;
+
+  if (existingReviewer) {
+    // Update existing review
+    reviewerId = existingReviewer.id;
+    await supabase
+      .from('approval_reviewers')
+      .update({
+        status: action,
+        display_name: nameToUse,
+        responded_at: new Date().toISOString(),
+      })
+      .eq('id', existingReviewer.id);
+  } else {
+    // Create new reviewer entry on the fly
+    const { data: newReviewer } = await supabase
+      .from('approval_reviewers')
+      .insert({
+        round_id: round.id,
+        email: emailToUse,
+        display_name: nameToUse,
+        user_id: null,
+        token: generateToken(),
+        status: action,
+        responded_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    reviewerId = newReviewer?.id || '';
+  }
 
   // Add comment if provided
   if (comment?.trim()) {
-    const { data: round } = await supabase
-      .from('approval_rounds')
-      .select('current_round_number')
-      .eq('id', reviewer.round_id)
-      .single();
-
     await supabase.from('approval_comments').insert({
-      round_id: reviewer.round_id,
-      reviewer_id: reviewer.id,
-      user_id: reviewer.user_id || null,
+      round_id: round.id,
+      reviewer_id: reviewerId,
+      user_id: null,
       author_name: nameToUse,
       content: comment.trim(),
-      round_number: round?.current_round_number || 1,
+      round_number: round.current_round_number || 1,
     });
   }
 
-  // Check if all reviewers approved -> update round status
+  // Re-check all reviewer statuses for this round
   const { data: allReviewers } = await supabase
     .from('approval_reviewers')
     .select('status')
-    .eq('round_id', reviewer.round_id);
+    .eq('round_id', round.id);
 
-  const allApproved = allReviewers?.every(r => r.status === 'approved');
+  const allApproved = allReviewers?.length && allReviewers.every(r => r.status === 'approved');
   const anyChanges = allReviewers?.some(r => r.status === 'changes_requested');
-
   const newRoundStatus = allApproved ? 'approved' : anyChanges ? 'changes_requested' : 'pending';
 
   await supabase
     .from('approval_rounds')
     .update({ status: newRoundStatus, updated_at: new Date().toISOString() })
-    .eq('id', reviewer.round_id);
+    .eq('id', round.id);
 
-  // Audit trail: log approval action with IP and user-agent
+  // Audit trail
   const userAgent = request.headers.get('user-agent') || 'unknown';
   await logActivity(request, {
     action: action === 'approved' ? 'approve' : 'request_changes',
     entityType: 'approval',
-    entityId: reviewer.round_id,
+    entityId: round.id,
     entityName: nameToUse,
-    userId: reviewer.user_id || undefined,
     metadata: {
-      reviewer_email: reviewer.email,
-      reviewer_id: reviewer.id,
-      ip: ip,
+      reviewer_email: emailToUse,
+      ip,
       user_agent: userAgent,
       round_status: newRoundStatus,
       comment: comment?.trim() || null,
+      open_link: true,
     },
   });
 

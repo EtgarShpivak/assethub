@@ -42,6 +42,12 @@ export async function POST(
     .update({ asset_type: 'production' })
     .in('id', assetIds);
 
+  // Mark round as finalized (keep status 'approved' but update timestamp)
+  await supabase
+    .from('approval_rounds')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', id);
+
   // Log activity
   await logActivity(request, {
     action: 'edit',

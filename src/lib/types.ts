@@ -218,6 +218,7 @@ export interface ApprovalRound {
   created_by: string;
   created_at: string;
   updated_at: string;
+  open_token?: string | null;
   // Joined data
   assets?: ApprovalRoundAsset[];
   reviewers?: ApprovalReviewer[];

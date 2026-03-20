@@ -52,18 +52,27 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const body = await request.json();
 
-  const { title, description, workspace_id, asset_ids, reviewers, link_expiry_days } = body as {
+  const { title, description, workspace_id, asset_ids, reviewers, link_expiry_days, open_link } = body as {
     title: string;
     description?: string;
     workspace_id: string;
     asset_ids: string[];
-    reviewers: { email: string; display_name?: string }[];
+    reviewers?: { email: string; display_name?: string }[];
     link_expiry_days?: number;
+    open_link?: boolean;
   };
 
-  if (!title || !workspace_id || !asset_ids?.length || !reviewers?.length) {
+  if (!title || !workspace_id || !asset_ids?.length) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
+
+  // Either reviewers or open_link must be provided
+  if (!open_link && (!reviewers || !reviewers.length)) {
+    return NextResponse.json({ error: 'Missing reviewers or open_link mode' }, { status: 400 });
+  }
+
+  // Generate open token if open_link mode
+  const openToken = open_link ? generateToken() : null;
 
   // Create the round
   const { data: round, error: roundError } = await supabase
@@ -73,6 +82,7 @@ export async function POST(request: NextRequest) {
       title,
       description: description || null,
       created_by: user.id,
+      open_token: openToken,
     })
     .select()
     .single();
@@ -88,31 +98,35 @@ export async function POST(request: NextRequest) {
   await supabase.from('approval_round_assets').insert(assetRows);
 
   // Add reviewers with unique tokens; auto-match internal users
-  const reviewerRows = [];
-  for (const r of reviewers) {
-    const { data: existingUser } = await supabase
-      .from('user_profiles')
-      .select('id, display_name')
-      .eq('email', r.email)
-      .single();
+  let savedReviewers: { email: string; token: string }[] | null = null;
+  if (reviewers && reviewers.length > 0) {
+    const reviewerRows = [];
+    for (const r of reviewers) {
+      const { data: existingUser } = await supabase
+        .from('user_profiles')
+        .select('id, display_name')
+        .eq('email', r.email)
+        .single();
 
-    const expiresAt = link_expiry_days
-      ? new Date(Date.now() + link_expiry_days * 24 * 60 * 60 * 1000).toISOString()
-      : null;
+      const expiresAt = link_expiry_days
+        ? new Date(Date.now() + link_expiry_days * 24 * 60 * 60 * 1000).toISOString()
+        : null;
 
-    reviewerRows.push({
-      round_id: round.id,
-      email: r.email,
-      display_name: r.display_name || existingUser?.display_name || null,
-      user_id: existingUser?.id || null,
-      token: generateToken(),
-      expires_at: expiresAt,
-    });
+      reviewerRows.push({
+        round_id: round.id,
+        email: r.email,
+        display_name: r.display_name || existingUser?.display_name || null,
+        user_id: existingUser?.id || null,
+        token: generateToken(),
+        expires_at: expiresAt,
+      });
+    }
+    const { data } = await supabase
+      .from('approval_reviewers')
+      .insert(reviewerRows)
+      .select();
+    savedReviewers = data;
   }
-  const { data: savedReviewers } = await supabase
-    .from('approval_reviewers')
-    .insert(reviewerRows)
-    .select();
 
   // Log activity
   await logActivity(request, {
@@ -122,15 +136,18 @@ export async function POST(request: NextRequest) {
     entityName: title,
     userId: user.id,
     workspaceId: workspace_id,
-    metadata: { asset_count: asset_ids.length, reviewer_count: reviewers.length },
+    metadata: { asset_count: asset_ids.length, reviewer_count: reviewers?.length || 0, open_link: !!open_link },
   });
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://assethub-seven.vercel.app';
 
   return NextResponse.json({
     round,
     reviewers: savedReviewers,
     review_links: savedReviewers?.map(r => ({
       email: r.email,
-      url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://assethub-seven.vercel.app'}/approve/${r.token}`,
-    })),
+      url: `${appUrl}/approve/${r.token}`,
+    })) || [],
+    open_review_url: openToken ? `${appUrl}/approve/open/${openToken}` : null,
   }, { status: 201 });
 }
