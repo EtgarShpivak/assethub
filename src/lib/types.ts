@@ -205,3 +205,61 @@ export interface ActivityLogEntry {
   metadata: Record<string, unknown>;
   created_at: string;
 }
+
+// --- Approval Workflow ---
+
+export interface ApprovalRound {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string | null;
+  status: 'pending' | 'approved' | 'changes_requested' | 'cancelled';
+  current_round_number: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  assets?: ApprovalRoundAsset[];
+  reviewers?: ApprovalReviewer[];
+  comments?: ApprovalComment[];
+  creator_name?: string;
+  // Annotated by pending endpoint
+  my_status?: string;
+  my_token?: string;
+  approval_reviewers?: ApprovalReviewer[];
+  approval_round_assets?: ApprovalRoundAsset[];
+  approval_comments?: ApprovalComment[];
+}
+
+export interface ApprovalRoundAsset {
+  id: string;
+  round_id: string;
+  asset_id: string;
+  round_number: number;
+  added_at: string;
+  asset?: Asset;
+  assets?: Asset;
+}
+
+export interface ApprovalReviewer {
+  id: string;
+  round_id: string;
+  user_id: string | null;
+  email: string;
+  display_name: string | null;
+  token: string;
+  status: 'pending' | 'approved' | 'changes_requested';
+  responded_at: string | null;
+  created_at: string;
+}
+
+export interface ApprovalComment {
+  id: string;
+  round_id: string;
+  reviewer_id: string | null;
+  user_id: string | null;
+  author_name: string;
+  content: string;
+  round_number: number;
+  created_at: string;
+}

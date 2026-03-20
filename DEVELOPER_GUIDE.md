@@ -142,6 +142,10 @@ interface UserPermissions {
 - `share_links` - Public share tokens
 - `upload_tokens` - External upload links
 - `saved_searches` - Saved filter configurations
+- `approval_rounds` - Approval workflow rounds
+- `approval_round_assets` - Assets linked to approval rounds
+- `approval_reviewers` - Reviewers with unique tokens
+- `approval_comments` - Discussion comments per round
 
 ### File Upload System
 
@@ -218,6 +222,23 @@ Example: `int-openday1832026-20260318-image-1x1_1024x1024-01.png`
 | POST | `/api/shares` | Required | Create share link |
 | GET | `/api/shares` | Public | Access shared assets |
 | GET | `/api/upload-tokens/[token]/validate` | Public | Validate upload token |
+
+### Approval Workflow
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/approvals` | Required | List my approval rounds |
+| POST | `/api/approvals` | Required | Create approval round |
+| GET | `/api/approvals/[id]` | Required | Get round details |
+| PATCH | `/api/approvals/[id]` | Required | Update round |
+| DELETE | `/api/approvals/[id]` | Required | Delete round |
+| GET | `/api/approvals/pending` | Required | Rounds pending my approval |
+| GET | `/api/approvals/review/[token]` | Public | View round by review token |
+| POST | `/api/approvals/review/[token]` | Public | Submit approval/comments |
+| POST | `/api/approvals/[id]/comments` | Required | Add comment |
+| POST | `/api/approvals/[id]/finalize` | Required | Move approved assets to library |
+| POST | `/api/approvals/[id]/assets` | Required | Add assets (new round) |
+| POST | `/api/approvals/[id]/reviewers` | Required | Add reviewer |
+| DELETE | `/api/approvals/[id]/reviewers` | Required | Remove reviewer |
 
 ---
 

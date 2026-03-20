@@ -8,13 +8,15 @@ export async function updateSession(request: NextRequest) {
   const publicPaths = ['/login', '/auth/callback', '/set-password'];
   const isExternalUpload = path.startsWith('/upload/') && path.split('/').length === 3 && path !== '/upload';
   const isSharedLink = path.startsWith('/shared/');
+  const isApproveLink = path.startsWith('/approve/');
   const isPublicApi =
     path.startsWith('/api/shares') ||
+    path.startsWith('/api/approvals/review/') ||
     (path.startsWith('/api/assets/') && path.includes('/download')) ||
     path === '/api/assets/download-zip';
   const isApiRoute = path.startsWith('/api/');
 
-  if (publicPaths.some(p => path.startsWith(p)) || isExternalUpload || isSharedLink || isPublicApi) {
+  if (publicPaths.some(p => path.startsWith(p)) || isExternalUpload || isSharedLink || isApproveLink || isPublicApi) {
     return NextResponse.next({ request });
   }
 

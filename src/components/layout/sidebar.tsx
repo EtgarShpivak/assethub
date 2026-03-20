@@ -21,6 +21,7 @@ import {
   UserCircle,
   BarChart3,
   Accessibility,
+  ClipboardCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n/provider';
@@ -51,6 +52,14 @@ const navEntries: NavEntry[] = [
   { href: '/assets?favorites=true', labelKey: 'nav.favorites', icon: Star },
   { href: '/assets?my=true', labelKey: 'nav.myAssets', icon: UserCircle },
   { href: '/upload', labelKey: 'nav.upload', icon: Upload },
+  {
+    labelKey: 'nav.approvals',
+    icon: ClipboardCheck,
+    children: [
+      { href: '/approvals', labelKey: 'nav.myApprovals', icon: ClipboardCheck },
+      { href: '/approvals/pending', labelKey: 'nav.pendingMyApproval', icon: ClipboardCheck },
+    ],
+  },
   {
     labelKey: 'nav.systemManagement',
     icon: Wrench,
