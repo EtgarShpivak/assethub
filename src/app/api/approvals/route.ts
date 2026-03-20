@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     .from('approval_rounds')
     .select(`
       *,
-      approval_reviewers(id, email, display_name, status, responded_at),
+      approval_reviewers(id, email, display_name, status, responded_at, token),
       approval_round_assets(id, asset_id, round_number)
     `)
     .eq('created_by', user.id)
