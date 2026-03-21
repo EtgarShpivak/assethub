@@ -65,7 +65,8 @@ import { FolderBrowser } from '@/components/assets/folder-browser';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CommentThread } from '@/components/assets/comment-thread';
 import { useComments } from '@/lib/hooks/use-comments';
-import { FolderTree } from 'lucide-react';
+import { FolderTree, ClipboardCheck } from 'lucide-react';
+import { CreateApprovalDialog } from '@/components/assets/create-approval-dialog';
 
 function FileTypeIcon({ type, size = 'md' }: { type: string; size?: 'sm' | 'md' | 'lg' }) {
   const cls = size === 'lg' ? 'w-16 h-16' : size === 'md' ? 'w-8 h-8' : 'w-5 h-5';
@@ -166,6 +167,7 @@ export default function AssetLibraryPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'tree'>('grid');
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
 
   // Multi-select filters
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -1329,6 +1331,10 @@ export default function AssetLibraryPage() {
                 <Star className="w-4 h-4 ml-1" />
                 הוסף למועדפים
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowApprovalDialog(true)}>
+                <ClipboardCheck className="w-4 h-4 ml-1" />
+                שלח לאישור
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setShowBulkEdit(true)}>
                 <Pencil className="w-4 h-4 ml-1" />
                 ערוך נבחרים
@@ -1894,6 +1900,11 @@ export default function AssetLibraryPage() {
                     setShareLink('');
                     setDetailAsset(null);
                   }}><Share2 className="w-4 h-4 ml-2" />שתף</Button>
+                  <Button variant="outline" onClick={() => {
+                    setSelectedAssets(new Set([detailAsset.id]));
+                    setShowApprovalDialog(true);
+                    setDetailAsset(null);
+                  }}><ClipboardCheck className="w-4 h-4 ml-2" />שלח לאישור</Button>
                   <Button
                     variant="outline"
                     onClick={() => versionInputRef.current?.click()}
@@ -2093,6 +2104,22 @@ export default function AssetLibraryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Approval Dialog */}
+      <CreateApprovalDialog
+        open={showApprovalDialog}
+        onClose={() => setShowApprovalDialog(false)}
+        preSelectedAssetIds={Array.from(selectedAssets)}
+        assetData={assets.filter(a => selectedAssets.has(a.id)).map(a => ({
+          id: a.id,
+          original_filename: a.original_filename,
+          stored_filename: a.stored_filename,
+          file_type: a.file_type,
+          drive_view_url: a.drive_view_url,
+          mime_type: a.mime_type,
+        }))}
+        onCreated={() => { setShowApprovalDialog(false); setSelectedAssets(new Set()); }}
+      />
 
       {/* Toast is now global via ToastProvider */}
     </div>

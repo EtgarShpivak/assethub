@@ -3,17 +3,53 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from '@/lib/i18n/provider';
 import {
-  ClipboardCheck, Plus, Trash2, Image as ImageIcon, X, Check
+  ClipboardCheck, Plus, Trash2, Image as ImageIcon, X, Check, Film, FileText, File as FileIcon
 } from 'lucide-react';
+
+interface AssetPreview {
+  id: string;
+  original_filename: string;
+  stored_filename?: string | null;
+  file_type: string;
+  drive_view_url?: string | null;
+  mime_type?: string | null;
+}
 
 interface CreateApprovalDialogProps {
   open: boolean;
   onClose: () => void;
   preSelectedAssetIds?: string[];
+  assetData?: AssetPreview[];
   onCreated?: () => void;
 }
 
-export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], onCreated }: CreateApprovalDialogProps) {
+function AssetThumbnail({ asset }: { asset: AssetPreview }) {
+  const name = asset.stored_filename || asset.original_filename;
+  if (asset.drive_view_url && asset.file_type === 'image') {
+    return (
+      <div className="w-16 h-16 rounded-lg overflow-hidden border border-[#E8E8E8] dark:border-gray-600 shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={asset.drive_view_url} alt={name} className="w-full h-full object-cover" />
+      </div>
+    );
+  }
+  if (asset.drive_view_url && asset.file_type === 'video') {
+    return (
+      <div className="w-16 h-16 rounded-lg overflow-hidden border border-[#E8E8E8] dark:border-gray-600 shrink-0 relative bg-gray-900">
+        <video src={asset.drive_view_url} className="w-full h-full object-cover" muted preload="metadata" />
+        <Film className="w-4 h-4 text-white absolute bottom-1 right-1 drop-shadow" />
+      </div>
+    );
+  }
+  const Icon = asset.file_type === 'pdf' || asset.file_type === 'newsletter' || asset.file_type === 'brief' ? FileText : FileIcon;
+  return (
+    <div className="w-16 h-16 rounded-lg border border-[#E8E8E8] dark:border-gray-600 shrink-0 flex items-center justify-center bg-[#FAFAFA] dark:bg-gray-700">
+      <Icon className="w-6 h-6 text-ono-gray" />
+    </div>
+  );
+}
+
+export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], assetData, onCreated }: CreateApprovalDialogProps) {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -22,6 +58,7 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
   const [submitting, setSubmitting] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
   const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [reviewLinks, setReviewLinks] = useState<{ email: string; url: string }[]>([]);
   const [openLink, setOpenLink] = useState('');
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
@@ -54,6 +91,7 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
     if (!title || !selectedAssetIds.length) return;
     if (!isOpenLink && !reviewerEmails.filter(e => e.trim()).length) return;
     setSubmitting(true);
+    setErrorMsg('');
     try {
       const res = await fetch('/api/approvals', {
         method: 'POST',
@@ -72,8 +110,14 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
         setReviewLinks(data.review_links || []);
         setOpenLink(data.open_review_url || '');
         setSuccess(true);
+        setErrorMsg('');
         onCreated?.();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'שגיאה ביצירת סבב אישור');
       }
+    } catch {
+      setErrorMsg('שגיאת רשת — נסה שוב');
     } finally {
       setSubmitting(false);
     }
@@ -195,9 +239,26 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
                 />
               </div>
 
-              <div className="flex items-center gap-2 text-sm text-ono-gray dark:text-gray-400">
-                <ImageIcon className="w-4 h-4" />
-                {selectedAssetIds.length} {t('approval.assets')}
+              {/* Asset previews */}
+              <div>
+                <label className="block text-sm font-medium text-ono-gray-dark dark:text-gray-200 mb-2 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4" />
+                  {selectedAssetIds.length} {t('approval.assets')}
+                </label>
+                {assetData && assetData.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 max-h-[140px] overflow-auto p-2 bg-[#FAFAFA] dark:bg-gray-700/50 rounded-lg border border-[#E8E8E8] dark:border-gray-600">
+                    {assetData.filter(a => selectedAssetIds.includes(a.id)).map(asset => (
+                      <div key={asset.id} className="flex flex-col items-center gap-1" title={asset.stored_filename || asset.original_filename}>
+                        <AssetThumbnail asset={asset} />
+                        <span className="text-[10px] text-ono-gray truncate max-w-[64px]">{asset.stored_filename || asset.original_filename}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-ono-gray dark:text-gray-500 bg-[#FAFAFA] dark:bg-gray-700/50 rounded-lg p-3 border border-[#E8E8E8] dark:border-gray-600">
+                    {selectedAssetIds.length} חומרים נבחרו
+                  </div>
+                )}
               </div>
 
               {/* Open Link Toggle */}
@@ -273,6 +334,12 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
                   >
                     <Plus className="w-3 h-3" /> {t('approval.addReviewer')}
                   </button>
+                </div>
+              )}
+
+              {errorMsg && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-400">
+                  {errorMsg}
                 </div>
               )}
 

@@ -54,6 +54,7 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
   const [submitting, setSubmitting] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
   const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [reviewLinks, setReviewLinks] = useState<{ email: string; url: string }[]>([]);
   const [openLink, setOpenLink] = useState('');
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
@@ -95,6 +96,7 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
     if (!title || !selectedAssetIds.length) return;
     if (!isOpenLink && !reviewerEmails.filter(e => e.trim()).length) return;
     setSubmitting(true);
+    setErrorMsg('');
     try {
       const res = await fetch('/api/approvals', {
         method: 'POST',
@@ -113,8 +115,14 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
         setReviewLinks(data.review_links || []);
         setOpenLink(data.open_review_url || '');
         setSuccess(true);
+        setErrorMsg('');
         onCreated();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'שגיאה ביצירת סבב אישור');
       }
+    } catch {
+      setErrorMsg('שגיאת רשת — נסה שוב');
     } finally {
       setSubmitting(false);
     }
@@ -363,6 +371,13 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
                   >
                     <Plus className="w-3 h-3" /> {t('approval.addReviewer')}
                   </button>
+                </div>
+              )}
+
+              {/* Error */}
+              {errorMsg && (
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-lg border border-red-200 dark:border-red-800">
+                  {errorMsg}
                 </div>
               )}
 

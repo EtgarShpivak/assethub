@@ -74,20 +74,45 @@ export async function POST(request: NextRequest) {
   // Generate open token if open_link mode
   const openToken = open_link ? generateToken() : null;
 
-  // Create the round
-  const { data: round, error: roundError } = await supabase
+  // Create the round — try with open_token first, fallback without it if column doesn't exist
+  const insertData: Record<string, unknown> = {
+    workspace_id,
+    title,
+    description: description || null,
+    created_by: user.id,
+  };
+  if (openToken) insertData.open_token = openToken;
+
+  let round: Record<string, unknown>;
+  const { data: roundData, error: roundError } = await supabase
     .from('approval_rounds')
-    .insert({
-      workspace_id,
-      title,
-      description: description || null,
-      created_by: user.id,
-      open_token: openToken,
-    })
+    .insert(insertData)
     .select()
     .single();
 
-  if (roundError) return NextResponse.json({ error: roundError.message }, { status: 500 });
+  if (roundError) {
+    // If open_token column doesn't exist, retry without it
+    if (openToken && roundError.message?.includes('open_token')) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('approval_rounds')
+        .insert({
+          workspace_id,
+          title,
+          description: description || null,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+      if (fallbackError) return NextResponse.json({ error: fallbackError.message }, { status: 500 });
+      round = fallbackData;
+    } else {
+      return NextResponse.json({ error: roundError.message }, { status: 500 });
+    }
+  } else {
+    round = roundData;
+  }
+
+  if (!round) return NextResponse.json({ error: 'Failed to create round' }, { status: 500 });
 
   // Add assets
   const assetRows = asset_ids.map(aid => ({
@@ -132,7 +157,7 @@ export async function POST(request: NextRequest) {
   await logActivity(request, {
     action: 'create',
     entityType: 'approval',
-    entityId: round.id,
+    entityId: round.id as string,
     entityName: title,
     userId: user.id,
     workspaceId: workspace_id,
