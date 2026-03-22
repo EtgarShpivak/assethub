@@ -5,7 +5,7 @@ import { useTranslation } from '@/lib/i18n/provider';
 import {
   ClipboardCheck, Plus, Users, Image as ImageIcon, Clock,
   CheckCircle2, AlertCircle, XCircle, Copy, Check, Trash2, ExternalLink,
-  ChevronDown, ChevronUp, MessageCircle
+  ChevronDown, ChevronUp, MessageCircle, Mail, Link as LinkIcon
 } from 'lucide-react';
 import type { ApprovalRound, ApprovalReviewer } from '@/lib/types';
 
@@ -208,7 +208,7 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
                 <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
                   <p className="text-xs font-bold text-green-700 dark:text-green-400 mb-1">קישור פתוח — כל מי שמקבל יכול לאשר:</p>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-green-800 dark:text-green-300 truncate flex-1 font-mono">{openLink}</span>
+                    <span className="text-xs text-green-800 dark:text-green-300 truncate flex-1 font-mono" dir="ltr">{openLink}</span>
                     <button
                       onClick={() => copyToClipboard(openLink)}
                       className="text-ono-green hover:underline text-xs shrink-0"
@@ -485,43 +485,56 @@ function RoundCard({ round, onDelete, onRefresh }: {
             {expanded ? <ChevronUp className="w-4 h-4 text-ono-gray" /> : <ChevronDown className="w-4 h-4 text-ono-gray" />}
           </div>
         </div>
+
+        {/* Open link — always visible, no expand needed */}
+        {round.open_token && (
+          <div
+            className="mt-3 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2"
+            onClick={e => e.stopPropagation()}
+          >
+            <LinkIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-300 shrink-0">קישור פתוח</span>
+            <span className="text-xs text-blue-600 dark:text-blue-400 font-mono truncate flex-1 select-all" dir="ltr">
+              {typeof window !== 'undefined' ? `${window.location.origin}/approve/open/${round.open_token}` : `/approve/open/${round.open_token}`}
+            </span>
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/approve/open/${round.open_token}`;
+                navigator.clipboard.writeText(url);
+                setCopiedToken(`open-${round.id}`);
+                setTimeout(() => setCopiedToken(null), 2000);
+              }}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 shrink-0 font-medium"
+            >
+              {copiedToken === `open-${round.id}` ? <><Check className="w-3 h-3" /> הועתק!</> : <><Copy className="w-3 h-3" /> העתק</>}
+            </button>
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/approve/open/${round.open_token}`;
+                const subject = encodeURIComponent(`בקשת אישור: ${round.title}`);
+                const body = encodeURIComponent(`שלום,\n\nנשלח אליך קישור לאישור חומרים.\nאנא לחץ על הקישור, עיין בחומרים ואשר:\n\n${url}\n\nתודה`);
+                window.location.href = `mailto:?subject=${subject}&body=${body}`;
+              }}
+              className="flex items-center gap-1 text-xs text-ono-gray hover:text-ono-gray-dark dark:text-gray-400 dark:hover:text-gray-200 shrink-0"
+            >
+              <Mail className="w-3 h-3" /> מייל
+            </button>
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/approve/open/${round.open_token}`;
+                const text = `📋 ${round.title}\nנא לבדוק ולאשר:\n${url}`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+              }}
+              className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 dark:text-green-400 shrink-0"
+            >
+              <MessageCircle className="w-3 h-3" /> WhatsApp
+            </button>
+          </div>
+        )}
       </div>
 
       {expanded && (
         <div className="border-t border-[#E8E8E8] dark:border-gray-700 p-4 space-y-3 bg-[#FAFAFA] dark:bg-gray-900/50">
-          {/* Open Link */}
-          {round.open_token && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <p className="text-xs font-bold text-blue-700 dark:text-blue-400 mb-1">קישור פתוח — כל מי שמקבל יכול לאשר:</p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-blue-800 dark:text-blue-300 truncate flex-1 font-mono">
-                  {window.location.origin}/approve/open/{round.open_token}
-                </span>
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}/approve/open/${round.open_token}`;
-                    navigator.clipboard.writeText(url);
-                    setCopiedToken('open');
-                    setTimeout(() => setCopiedToken(null), 2000);
-                  }}
-                  className="text-blue-600 hover:underline text-xs shrink-0"
-                >
-                  {copiedToken === 'open' ? '✓ הועתק!' : 'העתק'}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const url = `${window.location.origin}/approve/open/${round.open_token}`;
-                    const text = `\u{1F4CB} ${round.title}\n\u05E0\u05D0 \u05DC\u05D1\u05D3\u05D5\u05E7 \u05D5\u05DC\u05D0\u05E9\u05E8:\n${url}`;
-                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-                  }}
-                  className="flex items-center gap-1 text-xs text-green-600 hover:underline shrink-0"
-                >
-                  <MessageCircle className="w-3 h-3" /> WhatsApp
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Reviewers */}
           <div>
@@ -545,7 +558,19 @@ function RoundCard({ round, onDelete, onRefresh }: {
                       onClick={(e) => {
                         e.stopPropagation();
                         const url = `${window.location.origin}/approve/${r.token}`;
-                        const text = `\u{1F4CB} ${round.title}\n\u05E0\u05D0 \u05DC\u05D1\u05D3\u05D5\u05E7 \u05D5\u05DC\u05D0\u05E9\u05E8:\n${url}`;
+                        const subject = encodeURIComponent(`בקשת אישור: ${round.title}`);
+                        const body = encodeURIComponent(`שלום,\n\nנשלח אליך קישור לאישור חומרים.\nאנא לחץ על הקישור, עיין בחומרים ואשר:\n\n${url}\n\nתודה`);
+                        window.location.href = `mailto:${r.email}?subject=${subject}&body=${body}`;
+                      }}
+                      className="flex items-center gap-1 text-xs text-ono-gray hover:text-ono-gray-dark dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      <Mail className="w-3 h-3" /> מייל
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const url = `${window.location.origin}/approve/${r.token}`;
+                        const text = `📋 ${round.title}\nנא לבדוק ולאשר:\n${url}`;
                         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
                       }}
                       className="flex items-center gap-1 text-xs text-green-600 hover:underline"

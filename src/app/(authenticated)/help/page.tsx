@@ -575,10 +575,10 @@ export default function HelpPage() {
       </p>
 
       <div className="flex gap-6">
-        {/* Section Navigation */}
+        {/* Section Navigation — right side in RTL (dir="rtl" on html) */}
         <div className="w-64 shrink-0">
           <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-4 sticky top-4">
-            <h3 className="font-bold text-ono-gray-dark text-sm mb-3 px-2">נושאים</h3>
+            <h3 className="font-bold text-ono-gray-dark text-sm mb-3 px-2 text-right">נושאים</h3>
             <div className="space-y-1">
               {sections.map(section => (
                 <button
@@ -598,37 +598,38 @@ export default function HelpPage() {
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content — left side for RTL layout */}
         <div className="flex-1 space-y-5 min-w-0">
           <div className="bg-white border border-[#E8E8E8] rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-5">
+            {/* Section header — icon on right, text to its left (RTL) */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-ono-green-light rounded-xl flex items-center justify-center text-ono-green">
+              <div className="w-10 h-10 bg-ono-green-light rounded-xl flex items-center justify-center text-ono-green shrink-0">
                 {current.icon}
               </div>
-              <div>
+              <div className="text-right">
                 <h2 className="text-lg font-bold text-ono-gray-dark">{current.title}</h2>
                 <p className="text-sm text-ono-gray">{current.description}</p>
               </div>
             </div>
 
             <div>
-              <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-ono-green" />
+              <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2 text-right">
+                <BookOpen className="w-4 h-4 text-ono-green shrink-0" />
                 יכולות עיקריות
               </h3>
               <ul className="space-y-2">
                 {current.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-ono-gray-dark">
-                    <span className="text-ono-green mt-0.5 shrink-0">•</span>
-                    {feature}
+                  <li key={i} className="flex items-start gap-2 text-sm text-ono-gray-dark text-right">
+                    <span className="text-ono-green mt-1 shrink-0 text-xs">•</span>
+                    <span>{feature}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
             <div>
-              <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-ono-green" />
+              <h3 className="font-bold text-ono-gray-dark text-sm mb-3 flex items-center gap-2 text-right">
+                <HelpCircle className="w-4 h-4 text-ono-green shrink-0" />
                 שאלות נפוצות
               </h3>
               <FAQAccordion items={current.faq} />
@@ -636,40 +637,23 @@ export default function HelpPage() {
           </div>
 
           <div className="bg-ono-green-light border border-ono-green/20 rounded-lg p-5">
-            <h3 className="font-bold text-ono-green-dark text-sm mb-3">טיפים מהירים</h3>
+            <h3 className="font-bold text-ono-green-dark text-sm mb-3 text-right">טיפים מהירים</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Download className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>לחצו על חומר כדי לפתוח פרטים מלאים. משם אפשר להוריד, לשתף, לערוך ולארכב.</span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Calendar className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>לחצו על שדה התאריכים כדי לפתוח בורר תאריכים עם פריסטים מהירים ולוח שנה כפול.</span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Package className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>העלו קובץ ZIP והמערכת תפרק אותו אוטומטית. כל קובץ מוכר בתוכו יועלה בנפרד.</span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Search className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>שמרו חיפושים שאתם משתמשים בהם לעתים קרובות בלחיצה על סמל הסימנייה.</span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Filter className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>שלבו מספר פילטרים יחד לחיפוש מדויק: סלאג + קמפיין + תגית + טווח תאריכים.</span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Pencil className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>סמנו מספר חומרים ולחצו &ldquo;ערוך נבחרים&rdquo; כדי לעדכן תגיות, פלטפורמות וקמפיין בבת אחת.</span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Star className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>סמנו חומרים בכוכב כדי למצוא אותם מהר. לחצו על כפתור הכוכב בסרגל לראות רק מועדפים.</span>
-              </div>
-              <div className="flex items-start gap-2 text-sm text-ono-green-dark">
-                <Layers className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>צריכים לעדכן חומר? לחצו &ldquo;העלה גרסה חדשה&rdquo; מתוך חלונית הפרטים — המטא-דאטה יועתק אוטומטית.</span>
-              </div>
+              {[
+                { Icon: Download, text: 'לחצו על חומר כדי לפתוח פרטים מלאים. משם אפשר להוריד, לשתף, לערוך ולארכב.' },
+                { Icon: Calendar, text: 'לחצו על שדה התאריכים כדי לפתוח בורר תאריכים עם פריסטים מהירים ולוח שנה כפול.' },
+                { Icon: Package, text: 'העלו קובץ ZIP והמערכת תפרק אותו אוטומטית. כל קובץ מוכר בתוכו יועלה בנפרד.' },
+                { Icon: Search, text: 'שמרו חיפושים שאתם משתמשים בהם לעתים קרובות בלחיצה על סמל הסימנייה.' },
+                { Icon: Filter, text: 'שלבו מספר פילטרים יחד לחיפוש מדויק: סלאג + קמפיין + תגית + טווח תאריכים.' },
+                { Icon: Pencil, text: 'סמנו מספר חומרים ולחצו "ערוך נבחרים" כדי לעדכן תגיות, פלטפורמות וקמפיין בבת אחת.' },
+                { Icon: Star, text: 'סמנו חומרים בכוכב כדי למצוא אותם מהר. לחצו על כפתור הכוכב בסרגל לראות רק מועדפים.' },
+                { Icon: Layers, text: 'צריכים לעדכן חומר? לחצו "העלה גרסה חדשה" מתוך חלונית הפרטים — המטא-דאטה יועתק אוטומטית.' },
+              ].map(({ Icon, text }, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-ono-green-dark text-right">
+                  <Icon className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{text}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
