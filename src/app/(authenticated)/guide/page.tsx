@@ -21,6 +21,8 @@ import {
   Film,
   BarChart3,
   TrendingUp,
+  ClipboardCheck,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 export default function UserGuidePage() {
@@ -303,10 +305,47 @@ export default function UserGuidePage() {
         </div>
       </section>
 
-      {/* Section 9: Quick reference */}
+      {/* Section 9: Approvals */}
       <section className="bg-white border border-[#E8E8E8] rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-4">
         <div className="flex items-center gap-3 border-b border-[#E8E8E8] pb-3">
           <div className="w-8 h-8 bg-ono-green text-white rounded-lg flex items-center justify-center font-bold text-sm">9</div>
+          <h2 className="text-lg font-bold text-ono-gray-dark">שליחת חומרים לאישור</h2>
+        </div>
+        <p className="text-sm text-ono-gray-dark leading-relaxed">
+          מערכת האישורים מאפשרת לשלוח חומרים לסקירה ואישור של גורמים פנימיים או חיצוניים, ולעקוב אחרי הסטטוס בזמן אמת.
+        </p>
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <ClipboardCheck className="w-5 h-5 text-ono-green mt-0.5 shrink-0" />
+            <div>
+              <span className="font-bold text-ono-gray-dark text-sm block">יצירת סבב אישור</span>
+              <span className="text-sm text-ono-gray">סמנו חומר אחד או יותר בספריה ← &ldquo;שלח לאישור&rdquo;. בחרו שם לסבב, הוסיפו מאשרים לפי מייל.</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <LinkIcon className="w-5 h-5 text-ono-green mt-0.5 shrink-0" />
+            <div>
+              <span className="font-bold text-ono-gray-dark text-sm block">קישור פתוח</span>
+              <span className="text-sm text-ono-gray">אפשרות &ldquo;קישור פתוח&rdquo; יוצרת קישור שכל מי שמקבל אותו יכול לאשר — שימושי כשאין מייל המאשר מראש.</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-ono-green mt-0.5 shrink-0" />
+            <div>
+              <span className="font-bold text-ono-gray-dark text-sm block">מעקב סטטוס</span>
+              <span className="text-sm text-ono-gray">בדף &ldquo;אישורים&rdquo; ראו כל הסבבים: ממתין / אושר / דרושות תיקונים. לאחר קבלת כל האישורים, סמנו &ldquo;סיים סבב&rdquo;.</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-ono-gray-light rounded-lg p-3 text-xs text-ono-gray">
+          <strong>טיפ:</strong> קישורי האישור נשלחים ידנית (ווטסאפ, מייל וכו&apos;). העתיקו את הקישור מהדיאלוג ושלחו למאשר.
+        </div>
+      </section>
+
+      {/* Section 10: Quick reference */}
+      <section className="bg-white border border-[#E8E8E8] rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.07)] p-6 space-y-4">
+        <div className="flex items-center gap-3 border-b border-[#E8E8E8] pb-3">
+          <div className="w-8 h-8 bg-ono-green text-white rounded-lg flex items-center justify-center font-bold text-sm">10</div>
           <h2 className="text-lg font-bold text-ono-gray-dark">מילון מונחים מהיר</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -57,6 +57,7 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(preSelectedAssetIds);
   const [submitting, setSubmitting] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [reviewLinks, setReviewLinks] = useState<{ email: string; url: string }[]>([]);
@@ -69,27 +70,30 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setSelectedAssetIds(preSelectedAssetIds);
-      setSuccess(false);
-      setReviewLinks([]);
-      setOpenLink('');
-      fetch('/api/users/me')
-        .then(r => r.json())
-        .then(data => {
-          if (data.workspace_ids?.length) setWorkspaceId(data.workspace_ids[0]);
-        });
-      // Load active system users
-      fetch('/api/users/search')
-        .then(r => r.json())
-        .then(data => setSystemUsers(data.users || []))
-        .catch(() => {});
-    }
+    if (!open) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    setSelectedAssetIds(preSelectedAssetIds);
+    setSuccess(false);
+    setReviewLinks([]);
+    setOpenLink('');
+    setWorkspaceLoading(true);
+    fetch('/api/users/me', { signal })
+      .then(r => r.json())
+      .then(data => { if (!signal.aborted && data.workspace_ids?.length) setWorkspaceId(data.workspace_ids[0]); })
+      .catch(() => {})
+      .finally(() => { if (!signal.aborted) setWorkspaceLoading(false); });
+    fetch('/api/users/search', { signal })
+      .then(r => r.json())
+      .then(data => { if (!signal.aborted) setSystemUsers(data.users || []); })
+      .catch(() => {});
+    return () => controller.abort();
   }, [open, preSelectedAssetIds]);
 
   const handleSubmit = async () => {
     if (!title || !selectedAssetIds.length) return;
     if (!isOpenLink && !reviewerEmails.filter(e => e.trim()).length) return;
+    if (!workspaceId) { setErrorMsg('טוען נתוני חשבון — נסה שוב בעוד שנייה'); return; }
     setSubmitting(true);
     setErrorMsg('');
     try {
@@ -349,7 +353,7 @@ export function CreateApprovalDialog({ open, onClose, preSelectedAssetIds = [], 
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting || !title || !selectedAssetIds.length || (!isOpenLink && !reviewerEmails.some(e => e.trim()))}
+                  disabled={submitting || workspaceLoading || !workspaceId || !title || !selectedAssetIds.length || (!isOpenLink && !reviewerEmails.some(e => e.trim()))}
                   className="px-5 py-2 bg-ono-green text-white text-sm font-medium rounded-lg hover:bg-ono-green-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? t('common.loading') : t('approval.create')}

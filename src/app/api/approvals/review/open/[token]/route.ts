@@ -102,7 +102,9 @@ export async function POST(
   }
 
   const nameToUse = display_name.trim();
-  const emailToUse = email?.trim() || `anonymous-${Date.now()}@open-review`;
+  // For anonymous users (no email), use IP + round_id as stable dedup key
+  // so the same person can't vote multiple times from the same device
+  const emailToUse = email?.trim() || `anon-${ip}-${round.id}@open-review`;
 
   // Check if this person already reviewed (by email)
   const { data: existingReviewer } = await supabase
@@ -127,7 +129,7 @@ export async function POST(
       .eq('id', existingReviewer.id);
   } else {
     // Create new reviewer entry on the fly
-    const { data: newReviewer } = await supabase
+    const { data: newReviewer, error: insertError } = await supabase
       .from('approval_reviewers')
       .insert({
         round_id: round.id,
@@ -141,7 +143,10 @@ export async function POST(
       .select('id')
       .single();
 
-    reviewerId = newReviewer?.id || '';
+    if (insertError || !newReviewer?.id) {
+      return NextResponse.json({ error: 'Failed to record review' }, { status: 500 });
+    }
+    reviewerId = newReviewer.id;
   }
 
   // Add comment if provided

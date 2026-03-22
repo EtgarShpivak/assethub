@@ -53,6 +53,7 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [reviewLinks, setReviewLinks] = useState<{ email: string; url: string }[]>([]);
@@ -67,34 +68,36 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
 
   useEffect(() => {
     if (!open) return;
+    const controller = new AbortController();
+    const { signal } = controller;
     setSuccess(false);
     setReviewLinks([]);
     setOpenLink('');
     // Load assets for selection
-    fetch('/api/assets?limit=100&sort=upload_date&order=desc')
+    fetch('/api/assets?limit=100&sort=upload_date&order=desc', { signal })
       .then(r => r.json())
-      .then(data => {
-        setAssets(data.assets || []);
-      });
-    // Get workspace
-    fetch('/api/users/me')
-      .then(r => r.json())
-      .then(data => {
-        if (data.workspace_ids?.length) setWorkspaceId(data.workspace_ids[0]);
-      });
-    // Load active system users
-    fetch('/api/users/search')
-      .then(r => r.json())
-      .then(data => {
-        setSystemUsers(data.users || []);
-      })
+      .then(data => { if (!signal.aborted) setAssets(data.assets || []); })
       .catch(() => {});
+    // Get workspace
+    setWorkspaceLoading(true);
+    fetch('/api/users/me', { signal })
+      .then(r => r.json())
+      .then(data => { if (!signal.aborted && data.workspace_ids?.length) setWorkspaceId(data.workspace_ids[0]); })
+      .catch(() => {})
+      .finally(() => { if (!signal.aborted) setWorkspaceLoading(false); });
+    // Load active system users
+    fetch('/api/users/search', { signal })
+      .then(r => r.json())
+      .then(data => { if (!signal.aborted) setSystemUsers(data.users || []); })
+      .catch(() => {});
+    return () => controller.abort();
   }, [open]);
 
   const handleSubmit = async () => {
     // For open link mode, reviewers are optional
     if (!title || !selectedAssetIds.length) return;
     if (!isOpenLink && !reviewerEmails.filter(e => e.trim()).length) return;
+    if (!workspaceId) { setErrorMsg('טוען נתוני חשבון — נסה שוב בעוד שנייה'); return; }
     setSubmitting(true);
     setErrorMsg('');
     try {
@@ -388,7 +391,7 @@ function CreateApprovalModal({ open, onClose, onCreated }: {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting || !title || !selectedAssetIds.length || (!isOpenLink && !reviewerEmails.some(e => e.trim()))}
+                  disabled={submitting || workspaceLoading || !workspaceId || !title || !selectedAssetIds.length || (!isOpenLink && !reviewerEmails.some(e => e.trim()))}
                   className="px-5 py-2 bg-ono-green text-white text-sm font-medium rounded-lg hover:bg-ono-green-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? t('common.loading') : t('approval.create')}
@@ -428,8 +431,15 @@ function RoundCard({ round, onDelete, onRefresh }: {
     if (!confirm(t('approval.finalizeConfirm'))) return;
     setFinalizing(true);
     try {
-      await fetch(`/api/approvals/${round.id}/finalize`, { method: 'POST' });
-      onRefresh();
+      const res = await fetch(`/api/approvals/${round.id}/finalize`, { method: 'POST' });
+      if (res.ok) {
+        onRefresh();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'שגיאה בסיום סבב — נסה שוב');
+      }
+    } catch {
+      alert('שגיאת רשת — נסה שוב');
     } finally {
       setFinalizing(false);
     }
@@ -590,7 +600,12 @@ export default function MyApprovalsPage() {
   useEffect(() => { fetchRounds(); }, [fetchRounds]);
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/approvals/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/approvals/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || 'שגיאה במחיקת סבב — נסה שוב');
+      return;
+    }
     fetchRounds();
   };
 
